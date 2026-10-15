@@ -327,7 +327,7 @@ fn compile_lists(lists: Vec<(String, String)>, version: Option<String>, manifest
                 }
                 None => {
                     let msg = unsafe { err.as_ref() }.map(|e| e.localizedDescription().to_string()).unwrap_or_default();
-                    eprintln!("rzen: content blocker {list_id} failed to compile: {msg}");
+                    log!("rzen: content blocker {list_id} failed to compile: {msg}");
                     if !list_id.starts_with("rzen-cosmetic") {
                         j.borrow_mut().error = Some(format!("Filter list failed to compile: {msg}"));
                     }
@@ -514,8 +514,8 @@ pub fn new_window(sh: &Rc<Shared>, opener: Id, url: String, features: NewWindowF
             NewWindowResponse::Create { webview: wk }
         }
         Err(e) => {
-            eprintln!("rzen: popup failed, opening as tab: {e}");
-            let _ = sh.proxy.send_event(UserEvent::OpenTab(url, Some(opener)));
+            log!("rzen: popup failed, opening as tab: {e}");
+            let _ = sh.proxy.send_event(UserEvent::OpenTab(url));
             NewWindowResponse::Deny
         }
     }

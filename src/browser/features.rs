@@ -127,7 +127,7 @@ impl Browser {
                 let _ = v.set_visible(true);
                 self.ai_view = Some(v);
             }
-            Err(e) => eprintln!("rzen: AI panel failed: {e}"),
+            Err(e) => log!("rzen: AI panel failed: {e}"),
         }
     }
 
@@ -429,7 +429,7 @@ impl Browser {
         match self.boosted_tabs(id).into_iter().max_by_key(|&t| self.tab(t).map(|t| t.last_active)) {
             Some(t) => self.show(t),
             None => {
-                self.open_tab(format!("https://{host}/"), None, true);
+                self.open_tab(format!("https://{host}/"), true);
             }
         }
     }
@@ -468,7 +468,7 @@ impl Browser {
             self.mini_tab = target;
         }
         if debug() {
-            eprintln!("mini: media={:?} visible={:?} sidebar={} rect={:?} -> docked={:?}", self.media_tab, self.visible, self.sidebar_open, self.mini_rect, self.mini_tab);
+            log!("mini: media={:?} visible={:?} sidebar={} rect={:?} -> docked={:?}", self.media_tab, self.visible, self.sidebar_open, self.mini_rect, self.mini_tab);
         }
         if let (Some(v), Some((x, y, w, h))) = (self.mini_tab.and_then(|id| self.tab(id)).and_then(|t| t.view.as_ref()), self.mini_rect) {
             let _ = v.set_bounds(rect(x, y, w, h));
@@ -739,7 +739,7 @@ impl Browser {
             "tabs.open" => match url(self) {
                 Some(u) => {
                     let bg = p["background"].as_bool().unwrap_or(false);
-                    Ok(json!({ "tab_id": self.open_tab(u, None, !bg) }))
+                    Ok(json!({ "tab_id": self.open_tab(u, !bg) }))
                 }
                 None => Err("url is required".into()),
             },
@@ -756,7 +756,7 @@ impl Browser {
                     self.navigate(id, u);
                     Ok(json!({ "tab_id": id }))
                 }
-                (None, Some(u)) => Ok(json!({ "tab_id": self.open_tab(u, None, true) })),
+                (None, Some(u)) => Ok(json!({ "tab_id": self.open_tab(u, true) })),
                 _ => Err("url is required".into()),
             },
             "page.history" => match self.agent_view(target) {

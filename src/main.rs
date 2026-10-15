@@ -3,6 +3,15 @@
 //! Pages render in the OS engine (WKWebView = Safari's WebKit on macOS, WebView2 on
 //! Windows), so rzen adds almost nothing on top of the engine the OS already keeps warm.
 
+/// `log!` that never panics. Rust's own panics when stderr is gone (rzen started from a
+/// terminal that has since closed, or a log reader that stopped), and that crashed the app.
+macro_rules! log {
+    ($($arg:tt)*) => {{
+        use std::io::Write as _;
+        let _ = writeln!(std::io::stderr(), $($arg)*);
+    }};
+}
+
 mod agent;
 mod boosts;
 mod browser;
@@ -63,7 +72,7 @@ fn install_crash_log() {
             env!("CARGO_PKG_VERSION"),
             std::backtrace::Backtrace::force_capture()
         );
-        eprintln!("{line}");
+        let _ = std::io::stderr().write_all(line.as_bytes());
         if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(model::root_dir().join("crash.log")) {
             let _ = f.write_all(line.as_bytes());
         }
@@ -91,7 +100,7 @@ fn main() {
     let mut browser = match Browser::new(&event_loop, ctx) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("rzen: failed to start: {e}");
+            log!("rzen: failed to start: {e}");
             std::process::exit(1);
         }
     };

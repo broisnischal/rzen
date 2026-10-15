@@ -145,7 +145,7 @@ pub fn download(force: bool) {
             let _ = fs::rename(&part, &path);
         } else {
             let _ = fs::remove_file(&part);
-            eprintln!("rzen: couldn't update filter list {id}");
+            log!("rzen: couldn't update filter list {id}");
         }
     }
 }

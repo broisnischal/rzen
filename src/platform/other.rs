@@ -112,8 +112,8 @@ pub fn show_menu(window: &Window, menu: &Menu, x: f64, y: f64) {
     let _ = (window, menu, x, y);
 }
 
-pub fn new_window(sh: &Rc<Shared>, opener: Id, url: String, _: NewWindowFeatures) -> NewWindowResponse {
-    let _ = sh.proxy.send_event(UserEvent::OpenTab(url, Some(opener)));
+pub fn new_window(sh: &Rc<Shared>, _opener: Id, url: String, _: NewWindowFeatures) -> NewWindowResponse {
+    let _ = sh.proxy.send_event(UserEvent::OpenTab(url));
     NewWindowResponse::Deny
 }
 

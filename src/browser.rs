@@ -38,6 +38,9 @@ use crate::{
 
 const GAP: f64 = 8.0;
 const TICK: Duration = Duration::from_secs(15);
+/// How often the visible tab's back/forward state and address are re-read: single-page sites
+/// (YouTube, X, GitHub) navigate without a page load, so load events alone leave them stale.
+const NAV_POLL: Duration = Duration::from_millis(250);
 const PERF_EVERY: Duration = Duration::from_secs(2);
 /// Loaded-tab cap while macOS reports memory pressure.
 const PRESSURE_CAP: usize = 3;
@@ -115,7 +118,7 @@ pub enum UserEvent {
     Favicon(Id, String),
     /// A site icon finished downloading into the local cache.
     IconCached,
-    OpenTab(String, Option<Id>),
+    OpenTab(String),
     AdoptPopups,
     Crashed(Id),
     DownloadStarted(String),
@@ -289,6 +292,16 @@ fn build_internal_view(sh: &Rc<Shared>, html: &str) -> wry::Result<WebView> {
     Ok(view)
 }
 
+/// A short message at the bottom of the sidebar. Timed notices fade on their own; errors and
+/// anything with an action stay until dismissed, so they're never missed.
+struct Toast {
+    msg: String,
+    /// `None`: stays until the user dismisses it.
+    until: Option<Instant>,
+    /// Chrome message sent by the toast's button, with its label.
+    action: Option<(&'static str, &'static str)>,
+}
+
 pub struct Tab {
     pub d: TabData,
     pub view: Option<WebView>,
@@ -301,11 +314,28 @@ pub struct Tab {
     audible: bool,
     muted: bool,
     media: Option<Value>,
+    /// The tab a link opened this one from: Back and closing return there.
+    opener: Option<Id>,
+    /// Last time the tab was on screen (`None`: never shown since it was opened or restored).
+    shown: Option<Instant>,
 }
 
 impl Tab {
     fn new(d: TabData) -> Self {
-        Self { d, view: None, last_active: Instant::now(), loading: false, can_back: false, can_fwd: false, icon_host: String::new(), audible: false, muted: false, media: None }
+        Self {
+            d,
+            view: None,
+            last_active: Instant::now(),
+            loading: false,
+            can_back: false,
+            can_fwd: false,
+            icon_host: String::new(),
+            audible: false,
+            muted: false,
+            media: None,
+            opener: None,
+            shown: None,
+        }
     }
 
     fn is_settings(&self) -> bool {
@@ -365,6 +395,7 @@ enum Msg {
     Find { q: String, back: bool, again: bool },
     FindClose,
     OpenDownloads,
+    ToastClose,
     Ai,
     AiW { w: f64 },
     AiProvider { id: String },
@@ -450,10 +481,11 @@ pub struct Browser {
     palette_on_ready: bool,
     /// History version the command bar's local index was built from.
     palette_history: Option<u64>,
-    toast: Option<(String, Instant)>,
+    toast: Option<Toast>,
     ui_dirty: bool,
     save_at: Option<Instant>,
     next_tick: Instant,
+    nav_next: Instant,
     exiting: bool,
     /// CPU time per pid at the previous sample, for CPU %.
     perf_prev: HashMap<i32, u64>,
@@ -507,6 +539,7 @@ impl Browser {
         let dir = profile.dir.clone();
         let settings_path = dir.join("settings.json");
         let mut settings: Settings = model::load_json(&settings_path);
+        settings.migrate();
         if profile.id == PRIVATE_ID {
             // Agents drive your normal profile, never a private window.
             settings.agent_enabled = false;
@@ -643,6 +676,7 @@ impl Browser {
             ui_dirty: true,
             save_at: None,
             next_tick: Instant::now() + TICK,
+            nav_next: Instant::now(),
             exiting: false,
             perf_prev: HashMap::new(),
             perf_at: Instant::now(),
@@ -784,7 +818,13 @@ impl Browser {
     }
 
     fn set_toast(&mut self, msg: impl Into<String>, secs: u64) {
-        self.toast = Some((msg.into(), Instant::now() + Duration::from_secs(secs)));
+        self.toast = Some(Toast { msg: msg.into(), until: Some(Instant::now() + Duration::from_secs(secs)), action: None });
+        self.ui_dirty = true;
+    }
+
+    /// A toast that stays until dismissed, optionally with a button (`(message, label)`).
+    fn set_sticky_toast(&mut self, msg: impl Into<String>, action: Option<(&'static str, &'static str)>) {
+        self.toast = Some(Toast { msg: msg.into(), until: None, action });
         self.ui_dirty = true;
     }
 
@@ -885,7 +925,7 @@ impl Browser {
                 t.loading = !t.is_internal();
                 t.view = Some(view);
             }
-            Err(e) => eprintln!("rzen: could not create web view: {e}"),
+            Err(e) => log!("rzen: could not create web view: {e}"),
         }
     }
 
@@ -916,6 +956,7 @@ impl Browser {
         let r = self.content_rect();
         let t = &mut self.tabs[i];
         t.last_active = Instant::now();
+        t.shown = Some(t.last_active);
         if let Some(v) = t.view.as_ref().filter(|v| platform::attached(v, &self.sh.window)) {
             let _ = v.set_bounds(r);
             let _ = v.set_visible(true);
@@ -956,12 +997,12 @@ impl Browser {
         });
     }
 
-    fn open_tab(&mut self, url: String, after: Option<Id>, activate: bool) -> Id {
+    /// New tabs go to the top of the sidebar's tab list, newest first.
+    fn open_tab(&mut self, url: String, activate: bool) -> Id {
         let id = self.sh.alloc_id();
         let workspace = self.active_ws;
         let title = internal(&url).map_or_else(String::new, |p| p.1.to_string());
-        let pos = after.and_then(|a| self.idx(a)).map_or(self.tabs.len(), |i| i + 1);
-        self.tabs.insert(pos, Tab::new(TabData { id, url, title, workspace, ..Default::default() }));
+        self.tabs.insert(0, Tab::new(TabData { id, url, title, workspace, ..Default::default() }));
         if activate {
             self.show(id);
         }
@@ -978,7 +1019,7 @@ impl Browser {
         match self.tabs.iter().find(|t| t.d.url == url).map(|t| t.d.id) {
             Some(id) => self.show(id),
             None => {
-                self.open_tab(url.into(), None, true);
+                self.open_tab(url.into(), true);
             }
         }
     }
@@ -993,7 +1034,7 @@ impl Browser {
     fn navigate(&mut self, id: Id, url: String) {
         let Some(i) = self.idx(id) else { return };
         if self.tabs[i].is_internal() {
-            self.open_tab(url, Some(id), true);
+            self.open_tab(url, true);
             return;
         }
         let t = &mut self.tabs[i];
@@ -1110,9 +1151,34 @@ impl Browser {
         }
     }
 
+    /// Where to land when `id` goes away: the tab it was opened from, else the tab viewed most
+    /// recently, else its neighbour in the sidebar.
+    fn return_target(&self, id: Id) -> Option<Id> {
+        let order = self.display_order();
+        let opener = self.tab(id).and_then(|t| t.opener).filter(|o| order.contains(o));
+        let recent = || {
+            order.iter().filter(|&&x| x != id).filter_map(|&x| Some((self.tab(x)?.shown?, x))).max().map(|(_, x)| x)
+        };
+        opener.or_else(recent).or_else(|| self.neighbor(id))
+    }
+
+    /// Back through the page's history; a tab a link opened, with no history of its own,
+    /// closes and returns to the tab it came from.
+    fn back(&mut self) {
+        let Some(id) = self.active_id() else { return };
+        let Some(t) = self.tab(id) else { return };
+        match &t.view {
+            Some(v) if v.can_go_back().unwrap_or(false) => {
+                let _ = v.go_back();
+            }
+            _ if t.opener.is_some_and(|o| self.tab(o).is_some()) => self.close(id),
+            _ => {}
+        }
+    }
+
     fn close(&mut self, id: Id) {
         let Some(i) = self.idx(id) else { return };
-        let next = if self.active_id() == Some(id) { self.neighbor(id) } else { self.active_id() };
+        let next = if self.active_id() == Some(id) { self.return_target(id) } else { self.active_id() };
         let mut t = self.tabs.remove(i);
         t.d.url = t.current_url();
         if let Some(v) = t.view.take() {
@@ -1142,7 +1208,7 @@ impl Browser {
         if !keep {
             return self.close(id);
         }
-        let next = self.neighbor(id);
+        let next = self.return_target(id);
         self.hide_visible();
         self.unload(id);
         self.ws_mut().active = None;
@@ -1380,7 +1446,7 @@ impl Browser {
         match (self.settings.agent_enabled, self.agent.is_some()) {
             (true, false) => match AgentServer::start(self.sh.proxy.clone(), &self.dir) {
                 Ok(s) => self.agent = Some(s),
-                Err(e) => eprintln!("rzen: agent API failed to start: {e}"),
+                Err(e) => log!("rzen: agent API failed to start: {e}"),
             },
             (false, true) => self.agent = None,
             _ => {}
@@ -1447,7 +1513,7 @@ impl Browser {
                     ("proxy", Value::String(v)) if v.is_empty() || util::parse_proxy(v).is_some() => s.proxy = v.trim().to_string(),
                     ("mini_player", Value::Bool(v)) => s.mini_player = *v,
                     ("memory_limit_mb", v) => s.memory_limit_mb = v.as_u64().map_or(s.memory_limit_mb, |n| if n == 0 { 0 } else { n.max(512) }),
-                    _ => return eprintln!("rzen: unknown setting {key}={value}"),
+                    _ => return log!("rzen: unknown setting {key}={value}"),
                 }
                 self.save_settings();
                 self.apply_settings();
@@ -1580,6 +1646,7 @@ impl Browser {
         if mtime != self.settings_mtime {
             self.settings_mtime = mtime;
             self.settings = model::load_json(&path);
+            self.settings.migrate();
             self.apply_settings();
             self.push_settings();
         }
@@ -1632,11 +1699,11 @@ impl Browser {
         match ev {
             UserEvent::Chrome(s) => match serde_json::from_str::<Msg>(&s) {
                 Ok(m) => self.on_msg(m),
-                Err(e) => eprintln!("rzen: bad chrome message {s}: {e}"),
+                Err(e) => log!("rzen: bad chrome message {s}: {e}"),
             },
             UserEvent::Settings(s) => match serde_json::from_str::<SettingsMsg>(&s) {
                 Ok(m) => self.on_settings(m),
-                Err(e) => eprintln!("rzen: bad settings message {s}: {e}"),
+                Err(e) => log!("rzen: bad settings message {s}: {e}"),
             },
             UserEvent::Title(id, title) => {
                 let Some(i) = self.idx(id) else { return };
@@ -1661,7 +1728,7 @@ impl Browser {
             }
             UserEvent::Load(id, finished, url) => {
                 if debug() {
-                    eprintln!("load {id} finished={finished} {url}");
+                    log!("load {id} finished={finished} {url}");
                 }
                 let Some(i) = self.idx(id) else { return };
                 let t = &mut self.tabs[i];
@@ -1724,8 +1791,8 @@ impl Browser {
                     self.dirty();
                 }
             }
-            UserEvent::OpenTab(url, opener) => {
-                self.open_tab(url, opener, true);
+            UserEvent::OpenTab(url) => {
+                self.open_tab(url, true);
             }
             UserEvent::AdoptPopups => {
                 let popups = std::mem::take(&mut *self.sh.popups.borrow_mut());
@@ -1734,11 +1801,11 @@ impl Browser {
                         .tab(p.opener)
                         .map(|t| if t.d.essential { self.active_ws } else { t.d.workspace })
                         .unwrap_or(self.active_ws);
-                    let pos = self.idx(p.opener).map_or(self.tabs.len(), |i| i + 1);
                     let mut tab = Tab::new(TabData { id: p.id, url: p.url, workspace, ..Default::default() });
                     tab.view = Some(p.view);
                     tab.loading = true;
-                    self.tabs.insert(pos, tab);
+                    tab.opener = Some(p.opener);
+                    self.tabs.insert(0, tab);
                     self.show(p.id);
                 }
             }
@@ -1752,7 +1819,11 @@ impl Browser {
             }
             UserEvent::DownloadStarted(name) => self.set_toast(format!("Downloading {name}…"), 4),
             UserEvent::DownloadDone(ok) => {
-                self.set_toast(if ok { "Download finished. Click to open." } else { "Download failed" }, 6)
+                if ok {
+                    self.set_sticky_toast("Download finished", Some(("openDownloads", "Show")));
+                } else {
+                    self.set_sticky_toast("Download failed", None);
+                }
             }
             UserEvent::FindResult(found) => self.js(&format!("__rzen.findResult({found})")),
             UserEvent::Menu(id) => self.on_menu(&id),
@@ -1813,11 +1884,7 @@ impl Browser {
             Msg::Close { id } => self.close(id),
             Msg::NewTab => self.open_palette("new"),
             Msg::EditUrl => self.open_palette("edit"),
-            Msg::Back => {
-                if let Some(v) = self.active_view() {
-                    let _ = v.go_back();
-                }
-            }
+            Msg::Back => self.back(),
             Msg::Forward => {
                 if let Some(v) = self.active_view() {
                     let _ = v.go_forward();
@@ -1842,7 +1909,7 @@ impl Browser {
                             match self.active_id().filter(|_| mode == "edit") {
                                 Some(id) => self.navigate(id, url),
                                 None => {
-                                    self.open_tab(url, None, true);
+                                    self.open_tab(url, true);
                                 }
                             }
                         }
@@ -1908,7 +1975,15 @@ impl Browser {
                 self.focus_content();
                 self.ui_dirty = true;
             }
-            Msg::OpenDownloads => self.open_downloads(),
+            Msg::OpenDownloads => {
+                self.toast = None;
+                self.ui_dirty = true;
+                self.open_downloads();
+            }
+            Msg::ToastClose => {
+                self.toast = None;
+                self.ui_dirty = true;
+            }
             Msg::Ai => self.set_ai(!self.ai_open),
             Msg::AiW { w } => {
                 self.ai_w = w.clamp(300.0, 720.0);
@@ -2047,7 +2122,7 @@ impl Browser {
                 }
                 "duplicate" => {
                     if let Some(url) = self.tab(tid).map(Tab::current_url) {
-                        self.open_tab(url, Some(tid), true);
+                        self.open_tab(url, true);
                     }
                 }
                 "copy" => {
@@ -2181,11 +2256,7 @@ impl Browser {
                     v.open_devtools();
                 }
             }
-            "back" => {
-                if let Some(v) = self.active_view() {
-                    let _ = v.go_back();
-                }
-            }
+            "back" => self.back(),
             "forward" => {
                 if let Some(v) = self.active_view() {
                     let _ = v.go_forward();
@@ -2228,7 +2299,7 @@ impl Browser {
     pub fn open_urls(&mut self, urls: impl IntoIterator<Item = String>, eager: bool) {
         let mut last = None;
         for url in urls {
-            last = Some(self.open_tab(url, None, eager));
+            last = Some(self.open_tab(url, eager));
         }
         if let Some(id) = last {
             self.palette_on_ready = false;
@@ -2279,7 +2350,7 @@ impl Browser {
             "tabs": tabs,
             "active": active,
             "url": cur.map_or("", |t| t.d.url.as_str()),
-            "canBack": cur.is_some_and(|t| t.can_back),
+            "canBack": cur.is_some_and(|t| t.can_back || t.opener.is_some_and(|o| self.tab(o).is_some())),
             "canFwd": cur.is_some_and(|t| t.can_fwd),
             "loading": cur.is_some_and(|t| t.loading),
             "sidebarOpen": self.sidebar_open,
@@ -2287,7 +2358,10 @@ impl Browser {
             "sw": self.sidebar_w,
             "gap": GAP,
             "find": self.finding,
-            "toast": self.toast.as_ref().map(|t| t.0.as_str()),
+            "toast": self.toast.as_ref().map(|t| json!({
+                "text": t.msg, "sticky": t.until.is_none(),
+                "action": t.action.map(|(msg, label)| json!({ "t": msg, "label": label })),
+            })),
             "gate": self.gate,
             "profile": profile,
             "profiles": profiles,
@@ -2441,6 +2515,23 @@ impl Browser {
         self.history.save();
     }
 
+    fn sync_nav(&mut self) {
+        let Some(i) = self.visible.and_then(|id| self.idx(id)) else { return };
+        let t = &self.tabs[i];
+        let Some(v) = t.view.as_ref().filter(|_| !t.is_internal()) else { return };
+        let (back, fwd) = (v.can_go_back().unwrap_or(false), v.can_go_forward().unwrap_or(false));
+        let url = platform::view_url(v).filter(|u| !u.is_empty() && u != "about:blank" && *u != t.d.url);
+        if back == t.can_back && fwd == t.can_fwd && url.is_none() {
+            return;
+        }
+        let t = &mut self.tabs[i];
+        (t.can_back, t.can_fwd) = (back, fwd);
+        if let Some(u) = url {
+            t.d.url = u;
+        }
+        self.dirty();
+    }
+
     pub fn flush(&mut self, cf: &mut ControlFlow) {
         if self.quit {
             self.shutdown();
@@ -2461,7 +2552,11 @@ impl Browser {
             self.poll_media();
         }
         self.check_waiters(now);
-        if self.toast.as_ref().is_some_and(|t| t.1 <= now) {
+        if now >= self.nav_next {
+            self.nav_next = now + NAV_POLL;
+            self.sync_nav();
+        }
+        if self.toast.as_ref().and_then(|t| t.until).is_some_and(|until| until <= now) {
             self.toast = None;
             self.ui_dirty = true;
         }
@@ -2485,7 +2580,7 @@ impl Browser {
         let media_wake = any_live.then_some(self.media_next);
         let waiter_wake = (!self.waiters.is_empty()).then(|| now + Duration::from_millis(100));
         let badge_wake = self.agent_seen.map(|t| t + AGENT_BADGE);
-        let wake = [Some(self.next_tick), self.save_at, self.toast.as_ref().map(|t| t.1), perf_wake, media_wake, waiter_wake, badge_wake]
+        let wake = [Some(self.next_tick), self.save_at, self.toast.as_ref().and_then(|t| t.until), perf_wake, media_wake, waiter_wake, badge_wake]
             .into_iter()
             .flatten()
             .min();

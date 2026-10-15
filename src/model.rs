@@ -46,6 +46,9 @@ pub struct Settings {
     pub mini_player: bool,
     /// Unload least-recently-used background tabs while rzen's total memory is above this. 0 = no limit.
     pub memory_limit_mb: u64,
+    /// Which defaults this file was written with (see `Settings::migrate`). Missing = 0.
+    #[serde(default)]
+    pub defaults_version: u32,
 }
 
 impl Default for Settings {
@@ -55,19 +58,42 @@ impl Default for Settings {
             startup: "restore".into(),
             theme: "system".into(),
             block_trackers: true,
-            unload_after_minutes: 20,
-            max_live_tabs: 8,
+            unload_after_minutes: 60,
+            max_live_tabs: 16,
             ai_provider: "assistant".into(),
             ai_model: "claude-opus-5-5".into(),
             agent_enabled: false,
             proxy: String::new(),
             mini_player: true,
-            memory_limit_mb: 1024,
+            memory_limit_mb: 0,
+            defaults_version: SETTINGS_DEFAULTS,
         }
     }
 }
 
+/// Bumped when defaults change in a way existing profiles should pick up.
+const SETTINGS_DEFAULTS: u32 = 1;
+
 impl Settings {
+    /// Profiles from before v1 carry the old tab-unloading defaults (1 GB limit, 8 live tabs,
+    /// unload after 20 min), which reload tabs far too often on any Mac with room to spare.
+    /// Values still at those old defaults move to the new ones; anything the user picked stays.
+    /// macOS memory pressure still unloads background tabs when memory is really short.
+    pub fn migrate(&mut self) {
+        if self.defaults_version < 1 {
+            if self.memory_limit_mb == 1024 {
+                self.memory_limit_mb = 0;
+            }
+            if self.max_live_tabs == 8 {
+                self.max_live_tabs = 16;
+            }
+            if self.unload_after_minutes == 20 {
+                self.unload_after_minutes = 60;
+            }
+        }
+        self.defaults_version = SETTINGS_DEFAULTS;
+    }
+
     pub fn search_template(&self) -> &str {
         SEARCH_ENGINES
             .iter()
@@ -213,7 +239,7 @@ pub fn root_dir() -> PathBuf {
 pub fn load_json<T: DeserializeOwned + Default>(path: &Path) -> T {
     fs::read(path)
         .ok()
-        .and_then(|b| serde_json::from_slice(&b).map_err(|e| eprintln!("rzen: ignoring {}: {e}", path.display())).ok())
+        .and_then(|b| serde_json::from_slice(&b).map_err(|e| log!("rzen: ignoring {}: {e}", path.display())).ok())
         .unwrap_or_default()
 }
 
@@ -223,6 +249,6 @@ pub fn save_json<T: Serialize>(path: &Path, value: &T, pretty: bool) {
     let Ok(bytes) = bytes else { return };
     let tmp = path.with_extension("tmp");
     if fs::write(&tmp, bytes).and_then(|_| fs::rename(&tmp, path)).is_err() {
-        eprintln!("rzen: failed to save {}", path.display());
+        log!("rzen: failed to save {}", path.display());
     }
 }
