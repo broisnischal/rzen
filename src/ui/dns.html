@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fff; --fg: #0a0a0a; --fg2: oklch(0 0 0 / 0.55); --fg3: oklch(0 0 0 / 0.32);
+  --field: oklch(0 0 0 / 0.045); --line: oklch(0 0 0 / 0.1); --hover: oklch(0 0 0 / 0.07); --sel: oklch(0 0 0 / 0.08);
+  --surface: oklch(0 0 0 / 0.035); --ctl: #fff; --ctl-ring: 0 0 0 1px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --fg: #fafafa; --fg2: oklch(1 0 0 / 0.55); --fg3: oklch(1 0 0 / 0.3); --field: oklch(1 0 0 / 0.07); --line: oklch(1 0 0 / 0.12); --hover: oklch(1 0 0 / 0.09); --sel: oklch(1 0 0 / 0.11); --surface: oklch(1 0 0 / 0.06); --ctl: oklch(1 0 0 / 0.1); --ctl-ring: 0 0 0 0 transparent; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { background: var(--bg); }
+body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased; }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+button, select, input { font: inherit; color: var(--fg); }
+button { background: var(--field); border: 0; border-radius: 8px; height: 30px; padding-inline: 12px; font-weight: 500; white-space: nowrap; transition-property: background-color, scale, opacity; transition-duration: 150ms; transition-timing-function: var(--ease); }
+@media (hover: hover) { button:not(:disabled):hover { background: var(--hover); } }
+@media (prefers-reduced-motion: no-preference) { button:not(:disabled):active { scale: 0.96; } }
+button:disabled { opacity: 0.4; }
+button.primary { background: var(--fg); color: var(--bg); }
+@media (hover: hover) { button.primary:not(:disabled):hover { background: var(--fg); opacity: 0.85; } }
+select { background: var(--field); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px 6px; min-width: 0; max-width: 100%; }
+input.text { background: var(--field); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px; outline: none; min-width: 0; }
+input.text:focus { box-shadow: inset 0 0 0 1px var(--fg2); }
+
+main { max-width: 680px; margin-inline: auto; padding: 40px 24px 72px; }
+.head { display: block; margin-bottom: 24px; }
+.head .badge { display: none; }
+.head .badge svg { width: 22px; height: 22px; }
+.head h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px; }
+.head p { color: var(--fg2); text-wrap: pretty; }
+
+.group { border-radius: 12px; background: var(--surface); margin-bottom: 24px; overflow: hidden; }
+.group button:not(.primary):not(.seg *), .group select, .group input.text { background: var(--ctl); box-shadow: var(--ctl-ring); }
+.group-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fg2); margin: 24px 16px 8px; min-height: 30px; }
+.row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 56px; }
+.row { position: relative; }
+.row + .row::before { content: ''; position: absolute; top: 0; inset-inline: 16px 0; height: 1px; background: var(--line); }
+.row .text { flex: 1; min-width: 0; }
+.row .label { display: block; font-weight: 500; }
+.row p { color: var(--fg2); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.row .controls { display: flex; gap: 8px; align-items: center; flex: none; }
+.mono { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding-inline: 10px; border-radius: 12px; font-size: 12px; font-weight: 600; box-shadow: inset 0 0 0 1px var(--line); color: var(--fg2); flex: none; }
+.pill svg { width: 13px; height: 13px; }
+.pill.on { background: var(--fg); color: var(--bg); box-shadow: none; }
+
+/* resolver race */
+.res { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(80px, 1.4fr) 96px; gap: 16px; }
+.res .who { min-width: 0; }
+.res .who .label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.res .who .n { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.note { color: var(--fg2); font-size: 12px; margin: -8px 4px 0; }
+.tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 6px; background: var(--fg); color: var(--bg); flex: none; }
+.tag.soft { background: var(--field); color: var(--fg2); }
+.track { height: 8px; border-radius: 4px; background: var(--field); overflow: hidden; }
+.track i { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--fg2); }
+.res.best .track i { background: var(--fg); }
+@media (prefers-reduced-motion: no-preference) {
+  .track i { transition: width 500ms var(--ease); }
+  .res.pending .track i { width: 32%; background: var(--fg3); animation: scan 1.2s var(--ease) infinite; }
+}
+.res.pending .track i { width: 32%; background: var(--fg3); }
+@keyframes scan { from { translate: -100% 0; } to { translate: 320% 0; } }
+.res .ms { text-align: end; font-variant-numeric: tabular-nums; }
+.res .ms b { display: block; font-weight: 600; }
+.res .ms span { color: var(--fg2); font-size: 11.5px; }
+.res.dead .ms b { color: var(--fg2); font-weight: 500; }
+#race-sum .text p { font-size: 13px; color: var(--fg); margin: 0; }
+
+/* lookup */
+.lk { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; }
+.lk #lk-name { flex: 1 1 180px; }
+.lk select { flex: 0 1 200px; }
+.seg { display: inline-flex; background: var(--field); border-radius: 8px; padding: 2px; flex: none; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; height: 26px; line-height: 26px; padding-inline: 10px; border-radius: 6px; font-weight: 500; color: var(--fg2); transition: background-color 150ms var(--ease), color 150ms var(--ease); }
+.seg input:checked + span { background: var(--bg); color: var(--fg); box-shadow: 0 0 0 1px var(--line), 0 1px 2px oklch(0 0 0 / 0.12); }
+.seg input:focus-visible + span { outline: 2px solid var(--fg); outline-offset: 1px; }
+#lk-out { border-top: 1px solid var(--line); padding: 12px 16px 16px; }
+#lk-out:empty { display: none; }
+#lk-out .meta { color: var(--fg2); font-size: 12px; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+#lk-out .err { font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: start; font-size: 11.5px; font-weight: 600; color: var(--fg2); padding: 6px 0; border-bottom: 1px solid var(--line); }
+td { padding: 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th:first-child, td:first-child { width: 72px; }
+th:last-child, td:last-child { width: 72px; text-align: end; color: var(--fg2); }
+td.v { overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; padding-inline-end: 16px; }
+
+@media (max-width: 560px) {
+  main { padding: 24px 16px 48px; }
+  .row { flex-wrap: wrap; }
+  .res { grid-template-columns: 1fr auto; gap: 8px 16px; }
+  .res .track { grid-column: 1 / -1; grid-row: 2; }
+  .lk select { flex: 1 1 100%; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="head">
+    <div class="badge" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6"/></svg></div>
+    <div><h1>DNS</h1><p>Find the fastest resolver, look up any domain, and encrypt your lookups.</p></div>
+  </header>
+
+  <div class="group">
+    <div class="row">
+      <div class="text"><span class="label">Current DNS</span><p id="cur" class="mono">Checking…</p></div>
+      <span class="pill" id="enc-pill" hidden></span>
+    </div>
+    <div class="row">
+      <div class="text"><span class="label">VPN</span><p id="vpn">Checking…</p></div>
+    </div>
+  </div>
+
+  <div class="group-title"><span>Resolver race</span><button class="primary" id="race-run">Run benchmark</button></div>
+  <div class="group">
+    <div id="race"></div>
+    <div class="row" id="race-sum" hidden><div class="text"><p id="race-sum-text"></p></div><button id="race-use" hidden></button></div>
+  </div>
+  <p class="note" id="race-note">Times 8 popular domains against each resolver, straight from this Mac. Lower is faster.</p>
+
+  <div class="group-title"><span>Look up a domain</span></div>
+  <div class="group">
+    <form class="lk" id="lk">
+      <input class="text" id="lk-name" placeholder="example.com" aria-label="Domain" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+      <select id="lk-server" aria-label="Resolver"></select>
+      <div class="seg" role="radiogroup" aria-label="Record type">
+        <label><input type="radio" name="kind" value="A" checked><span>A</span></label>
+        <label><input type="radio" name="kind" value="AAAA"><span>AAAA</span></label>
+        <label><input type="radio" name="kind" value="CNAME"><span>CNAME</span></label>
+      </div>
+      <button class="primary" type="submit">Look up</button>
+    </form>
+    <div id="lk-out" role="status"></div>
+  </div>
+
+  <div class="group-title"><span>Change DNS</span></div>
+  <div class="group">
+    <div class="row">
+      <div class="text"><label class="label" for="sys-pick">DNS for this Mac</label><p>Sets the resolver on Wi-Fi and Ethernet for every app. macOS asks for your password. Works even when profiles are refused.</p></div>
+      <div class="controls"><select id="sys-pick" aria-label="Provider" style="min-width:150px"><option value="automatic">Automatic</option></select><button id="sys-apply">Apply</button></div>
+    </div>
+    <div class="row">
+      <div class="text">
+        <label class="label" for="enc-pick">Encrypted DNS profile</label>
+        <p>Installs a DNS-over-HTTPS profile, so your network can't read or change your lookups. You approve it in System Settings. macOS 26 sometimes refuses these with a "VPN Service" error; use DNS for this Mac above instead.</p>
+        <input class="text" id="enc-custom" placeholder="https://dns.nextdns.io/your-id" spellcheck="false" aria-label="Custom DNS-over-HTTPS URL" style="width:100%;margin-top:8px" hidden>
+      </div>
+      <div class="controls"><select id="enc-pick" aria-label="Provider" style="min-width:150px"></select><button id="enc-install">Install</button></div>
+    </div>
+  </div>
+
+  <div class="group-title"><span>Maintenance</span></div>
+  <div class="group">
+    <div class="row"><div class="text"><span class="label">Flush DNS cache</span><p>Fixes sites that moved or won't load. macOS asks for your password.</p></div><button id="flush">Flush</button></div>
+    <div class="row"><div class="text"><span class="label">Clear page cache</span><p>Clears cached files. Logins stay.</p></div><button id="cache">Clear</button></div>
+    <div class="row"><div class="text"><span class="label">Speed Test</span><p>Download, upload, latency and jitter.</p></div><button id="speed">Open</button></div>
+  </div>
+</main>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const send = (o) => window.ipc.postMessage(JSON.stringify(o));
+  const isIPv4 = (s) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
+  // Scoped IPv6 (fe80::1%en0) can't be queried directly; skip it.
+  const usable = (s) => isIPv4(s) || (s.includes(':') && /^[0-9a-f:.]+$/i.test(s));
+  const fmtMs = (v) => (v == null ? '–' : v >= 100 ? String(Math.round(v)) : v.toFixed(1));
+  let providers = [], current = [];
+
+  const providerFor = (ip) => providers.find((p) => (p.ips || []).includes(ip));
+  const nameFor = (ip) => providerFor(ip)?.name || 'Your current DNS';
+
+  // ---------- current DNS ----------
+  function renderCurrent(n) {
+    $('#cur').textContent = n.dns.length ? n.dns.join(', ') : 'Automatic (from your router)';
+    const pill = $('#enc-pill');
+    pill.hidden = false;
+    pill.classList.toggle('on', !!n.encrypted);
+    pill.innerHTML = n.encrypted
+      ? '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Encrypted'
+      : '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7"/></svg>Not encrypted';
+    $('#vpn').textContent = n.vpn ? 'Connected: ' + n.vpn : 'No VPN connected on this Mac.';
+  }
+
+  // ---------- resolver race ----------
+  const race = $('#race');
+  const results = new Map();
+  let servers = [], racing = false, raceTimer = 0;
+  function raceServers() {
+    const list = [];
+    for (const ip of current) if (usable(ip) && !list.includes(ip)) list.push(ip);
+    for (const p of providers) {
+      const ip = (p.ips || []).find(isIPv4);
+      if (ip && !list.includes(ip)) list.push(ip);
+    }
+    return list.slice(0, 16);
+  }
+  function renderRace() {
+    const next = raceServers();
+    if (next.join() === servers.join() && race.childElementCount) return;
+    servers = next;
+    race.textContent = '';
+    for (const ip of servers) {
+      const row = document.createElement('div');
+      row.className = 'row res';
+      row.dataset.ip = ip;
+      row.innerHTML = '<div class="who"><span class="label"><span class="n"></span></span><p class="mono"></p></div><div class="track" aria-hidden="true"><i></i></div><div class="ms"><b>–</b><span></span></div>';
+      row.querySelector('.n').textContent = nameFor(ip);
+      row.querySelector('p').textContent = ip;
+      if (current.includes(ip)) {
+        const t = document.createElement('span');
+        t.className = 'tag soft';
+        t.textContent = 'Current';
+        row.querySelector('.label').append(t);
+      }
+      race.append(row);
+    }
+    updateRace();
+  }
+  function updateRace() {
+    const done = [...results.values()].filter((r) => r.median != null);
+    const max = Math.max(1, ...done.map((r) => r.median));
+    const finished = servers.length > 0 && servers.every((ip) => results.has(ip));
+    const best = finished && done.length ? done.reduce((a, b) => (b.median < a.median ? b : a)) : null;
+    for (const row of race.children) {
+      const ip = row.dataset.ip, r = results.get(ip);
+      const bar = row.querySelector('.track i'), b = row.querySelector('.ms b'), sub = row.querySelector('.ms span');
+      row.classList.toggle('pending', racing && !r);
+      row.classList.toggle('dead', !!r && r.median == null);
+      row.classList.toggle('best', !!best && best.server === ip);
+      row.querySelector('.tag:not(.soft)')?.remove();
+      if (best && best.server === ip) {
+        const t = document.createElement('span');
+        t.className = 'tag';
+        t.textContent = 'Fastest';
+        row.querySelector('.label').append(t);
+      }
+      if (!r) { bar.style.width = ''; b.textContent = racing ? 'Testing…' : '–'; sub.textContent = ''; continue; }
+      if (r.median == null) { bar.style.width = '0%'; b.textContent = 'No response'; sub.textContent = '0/' + r.total; continue; }
+      bar.style.width = Math.max(4, (r.median / max) * 100) + '%';
+      b.textContent = fmtMs(r.median) + ' ms';
+      sub.textContent = 'best ' + fmtMs(r.best) + (r.ok < r.total ? ' · ' + r.ok + '/' + r.total : '');
+    }
+    if (finished && racing) finish(best);
+  }
+  function finish(best) {
+    racing = false;
+    clearTimeout(raceTimer);
+    const btn = $('#race-run');
+    btn.disabled = false;
+    btn.textContent = 'Run again';
+    // Fastest first, unreachable last.
+    const key = (row) => results.get(row.dataset.ip)?.median ?? Infinity;
+    for (const row of [...race.children].sort((a, b) => key(a) - key(b))) race.append(row);
+    const sum = $('#race-sum'), text = $('#race-sum-text'), use = $('#race-use');
+    sum.hidden = false;
+    use.hidden = true;
+    if (!best) { text.textContent = 'No resolver answered. Check your connection, VPN or firewall.'; return; }
+    const cur = current.map((ip) => results.get(ip)).filter((r) => r && r.median != null).sort((a, b) => a.median - b.median)[0];
+    const bestName = nameFor(best.server);
+    if (cur && cur.server === best.server) {
+      text.textContent = 'Your current DNS is the fastest here, at ' + fmtMs(best.median) + ' ms.';
+    } else if (cur) {
+      const x = cur.median / best.median;
+      text.textContent = bestName + ' is ' + (x >= 1.95 ? Math.round(x) + '× faster' : Math.round((x - 1) * 100) + '% faster') + ' than your current DNS (' + fmtMs(best.median) + ' vs ' + fmtMs(cur.median) + ' ms).';
+    } else {
+      text.textContent = bestName + ' is the fastest here, at ' + fmtMs(best.median) + ' ms.';
+    }
+    const p = providerFor(best.server);
+    if (p && p.doh && !(cur && cur.server === best.server)) {
+      use.hidden = false;
+      use.textContent = 'Use ' + p.name.split(',')[0];
+      use.onclick = () => send({ t: 'setSystemDns', provider: p.id });
+    }
+  }
+  $('#race-run').addEventListener('click', () => {
+    if (racing) return;
+    servers = [];
+    renderRace();
+    if (!servers.length) return;
+    results.clear();
+    racing = true;
+    $('#race-sum').hidden = true;
+    const btn = $('#race-run');
+    btn.disabled = true;
+    btn.textContent = 'Racing…';
+    updateRace();
+    send({ t: 'dnsBench', servers });
+    // Each resolver times out on its own; this only guards against a lost reply.
+    raceTimer = setTimeout(() => {
+      for (const ip of servers) if (!results.has(ip)) results.set(ip, { server: ip, median: null, best: null, ok: 0, total: 8 });
+      updateRace();
+    }, 20000);
+  });
+
+  // ---------- lookup ----------
+  const sel = $('#lk-server');
+  function renderServers() {
+    const keep = sel.value;
+    sel.textContent = '';
+    for (const ip of current.filter(usable)) sel.add(new Option('Current DNS · ' + ip, ip));
+    for (const p of providers) {
+      const ip = (p.ips || []).find(isIPv4);
+      if (ip && !current.includes(ip)) sel.add(new Option(p.name + ' · ' + ip, ip));
+    }
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  }
+  const ttl = (s) => {
+    if (s < 60) return s + 's';
+    const units = [[86400, 'd'], [3600, 'h'], [60, 'm'], [1, 's']];
+    const out = [];
+    for (const [n, u] of units) if (s >= n && out.length < 2) { out.push(Math.floor(s / n) + u); s %= n; }
+    return out.join(' ');
+  };
+  let pending = null;
+  $('#lk').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const raw = $('#lk-name').value.trim();
+    let name = raw;
+    try { name = new URL(raw.includes('://') ? raw : 'http://' + raw).hostname; } catch {}
+    name = name.replace(/\.$/, '');
+    if (!name || !sel.value) { $('#lk-name').focus(); return; }
+    const kind = document.querySelector('input[name="kind"]:checked').value;
+    pending = { name, server: sel.value, kind };
+    const out = $('#lk-out');
+    out.textContent = '';
+    const m = document.createElement('div');
+    m.className = 'meta';
+    m.textContent = 'Looking up ' + name + '…';
+    out.append(m);
+    send({ t: 'dnsLookup', name, server: sel.value, kind });
+  });
+  function showLookup(l) {
+    if (!pending || l.name !== pending.name || l.server !== pending.server) return;
+    const out = $('#lk-out');
+    out.textContent = '';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const via = nameFor(l.server) === 'Your current DNS' ? 'your current DNS (' + l.server + ')' : nameFor(l.server) + ' (' + l.server + ')';
+    if (l.error) {
+      meta.className = 'meta err';
+      meta.textContent = l.name + ': ' + l.error + ' · via ' + via;
+      out.append(meta);
+      return;
+    }
+    const recs = l.records || [];
+    meta.textContent = (recs.length ? recs.length + (recs.length === 1 ? ' record' : ' records') : 'No ' + pending.kind + ' records') + ' · ' + fmtMs(l.ms) + ' ms via ' + via;
+    out.append(meta);
+    if (!recs.length) return;
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th scope="col">Type</th><th scope="col">Value</th><th scope="col">TTL</th></tr></thead><tbody></tbody>';
+    for (const r of recs) {
+      const tr = document.createElement('tr');
+      for (const [v, cls] of [[r.kind, ''], [r.value, 'v mono'], [ttl(r.ttl), '']]) {
+        const td = document.createElement('td');
+        if (cls) td.className = cls;
+        td.textContent = v;
+        tr.append(td);
+      }
+      table.tBodies[0].append(tr);
+    }
+    out.append(table);
+  }
+
+  // ---------- encrypted DNS & maintenance ----------
+  const enc = $('#enc-pick');
+  enc.addEventListener('change', () => { $('#enc-custom').hidden = enc.value !== 'custom'; });
+  $('#sys-apply').addEventListener('click', () => send({ t: 'setSystemDns', provider: $('#sys-pick').value }));
+  $('#enc-install').addEventListener('click', () => send({ t: 'installDns', provider: enc.value, custom: enc.value === 'custom' ? $('#enc-custom').value.trim() || null : null }));
+  $('#flush').addEventListener('click', () => send({ t: 'flushDns' }));
+  $('#cache').addEventListener('click', () => send({ t: 'clearCache' }));
+  $('#speed').addEventListener('click', () => send({ t: 'openPage', url: 'rzen://speedtest' }));
+
+  window.__settings = {
+    load(d) {
+      const next = d.dnsProviders || [];
+      if (next.length === providers.length) return;
+      providers = next;
+      if (!enc.options.length) for (const p of providers) enc.add(new Option(p.name, p.id));
+      const sys = $('#sys-pick');
+      if (sys.options.length === 1) for (const p of providers) if (p.ips && p.ips.length) sys.add(new Option(p.name, p.id));
+      if (!racing) renderRace();
+      renderServers();
+    },
+    net(n) {
+      current = (n.dns || []).filter(Boolean);
+      renderCurrent({ dns: current, encrypted: n.encrypted, vpn: n.vpn });
+      if (!racing) renderRace();
+      renderServers();
+    },
+  };
+  window.__dns = {
+    result(v) {
+      if (v.bench) { results.set(v.bench.server, v.bench); if (servers.includes(v.bench.server)) updateRace(); }
+      if (v.lookup) showLookup(v.lookup);
+    },
+  };
+  send({ t: 'get' });
+  send({ t: 'netInfo' });
+})();
+</script>
+</body>
+</html>
