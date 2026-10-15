@@ -22,7 +22,6 @@ use objc2_foundation::{
     NSArray, NSBundle, NSComparisonResult, NSDictionary, NSError, NSNumber, NSObject, NSPoint, NSProcessInfo, NSRect, NSRectEdge, NSSize,
     NSString, NSURL, NSUUID,
 };
-use objc2_quartz_core::{CALayer, CATransaction};
 use objc2_web_kit::{
     WKContentRuleList, WKContentRuleListStore, WKMediaCaptureState, WKPreferences, WKUserScript, WKUserScriptInjectionTime, WKWebView,
     WKWebViewConfiguration, WKWebsiteDataStore,
@@ -142,33 +141,6 @@ pub fn style_content(view: &WebView) {
         layer.setMasksToBounds(true);
     }
     apply_blocker(view);
-}
-
-/// Shows only the first `width` points of a page (corners rounded like the page) without
-/// resizing it, so WebKit doesn't reflow. `None` removes the clip.
-pub fn clip_width(view: &WebView, width: Option<f64>) {
-    let Some(layer) = view.webview().layer() else { return };
-    CATransaction::begin();
-    CATransaction::setDisableActions(true);
-    match width {
-        Some(w) => {
-            let mask = layer.mask().unwrap_or_else(|| {
-                let m = CALayer::new();
-                m.setBackgroundColor(Some(&NSColor::blackColor().CGColor()));
-                m.setCornerRadius(CONTENT_RADIUS);
-                unsafe { layer.setMask(Some(&m)) };
-                m
-            });
-            let h = layer.bounds().size.height;
-            mask.setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(w.max(0.0), h)));
-        }
-        None => {
-            if layer.mask().is_some() {
-                unsafe { layer.setMask(None) };
-            }
-        }
-    }
-    CATransaction::commit();
 }
 
 /// Turns ad and tracker blocking on/off. Rules run in WebKit's content-rule engine (the

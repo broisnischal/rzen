@@ -33,7 +33,6 @@ pub fn blocker_status() -> crate::filters::FilterStatus {
 }
 pub fn refresh_filters(_force: bool) {}
 pub fn set_chrome_on_top(_chrome: &WebView, _on_top: bool) {}
-pub fn clip_width(_view: &WebView, _width: Option<f64>) {}
 pub fn extend_wry(_chrome: &WebView) {}
 pub fn notifications_supported() -> bool {
     false
