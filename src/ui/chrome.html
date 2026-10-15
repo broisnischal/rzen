@@ -874,10 +874,15 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 
   const msgs = $('#msgs'), input = $('#ai-input'), sendBtn = $('#ai-send'), ctxBtn = $('#ctx');
   const assistant = {
+    // key: undefined = not asked yet, false = waiting on the Keychain, null = none, else the key.
     key: undefined, history: [], running: false, abort: null, calls: new Map(), seq: 0,
+    // Runs on every render, so it only builds what is missing; rebuilding would flicker
+    // the panel, wipe a half-typed key and steal focus from the page.
     ready() {
-      if (this.key === undefined) { this.key = null; send({ t: 'aiKeyGet' }); return; }
-      if (!this.key) this.keyCard(); else if (!msgs.children.length) this.intro();
+      if (this.key === undefined) { this.key = false; send({ t: 'aiKeyGet' }); return; }
+      if (this.key === false) return;
+      if (!this.key) { if (!$('#keycard')) this.keyCard(); }
+      else if (!msgs.children.length) this.intro();
     },
     intro() {
       msgs.innerHTML = '<div class="intro"><h2>How can I help?</h2><p>I can read this page, answer questions about it, and take actions in your tabs.</p></div>';
