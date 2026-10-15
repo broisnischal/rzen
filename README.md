@@ -17,6 +17,16 @@ Pages render in the engine the OS already ships and keeps warm: WKWebView (Safar
 - **Performance panel.** Memory and CPU for the browser plus every WebKit helper process, matching Activity Monitor.
 - **AI agents.** An opt-in local automation API (127.0.0.1 only, per-run bearer token) and an MCP server.
 
+## Download
+
+Get the latest `.dmg` from [Releases](https://github.com/broisnischal/rzen/releases/latest), open it and drag rzen to Applications. It runs on Apple silicon and Intel Macs with macOS 13 or later.
+
+rzen isn't notarized yet, so macOS blocks the first launch. Open **System Settings → Privacy & Security** and click **Open Anyway**, or run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/rzen.app
+```
+
 ## Build
 
 Requires Rust (edition 2024). macOS 13+ gets the full native integration; other platforms use portable fallbacks.
@@ -32,6 +42,12 @@ To build `rzen.app` (needed for "Make default browser" and Dock integration):
 ```
 
 Passkeys need Apple's browser entitlement and a real signature; see the comments in `scripts/bundle-macos.sh`.
+
+To build the downloadable disk image (universal app, plus a zip and checksums, in `dist/`):
+
+```sh
+./scripts/package-macos.sh
+```
 
 ## Use with AI agents
 

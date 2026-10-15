@@ -2,12 +2,21 @@
 # Builds an optimized rzen.app (needed for "Make default browser" and Dock integration).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-cargo build --release
+# RZEN_UNIVERSAL=1 builds one binary for Apple silicon and Intel (for downloads).
+if [[ "${RZEN_UNIVERSAL:-}" == 1 ]]; then
+  cargo build --release --target aarch64-apple-darwin
+  cargo build --release --target x86_64-apple-darwin
+  BIN=target/release/rzen-universal
+  lipo -create -output "$BIN" target/aarch64-apple-darwin/release/rzen target/x86_64-apple-darwin/release/rzen
+else
+  cargo build --release
+  BIN=target/release/rzen
+fi
 APP=target/release/rzen.app
 VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp target/release/rzen "$APP/Contents/MacOS/rzen"
+cp "$BIN" "$APP/Contents/MacOS/rzen"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # macOS 26 renders the Icon Composer icon with Liquid Glass; older systems use the .icns.
 ICON_NAME=""
