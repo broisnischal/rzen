@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fff; --fg: #0a0a0a; --fg2: oklch(0 0 0 / 0.55); --fg3: oklch(0 0 0 / 0.32);
+  --field: oklch(0 0 0 / 0.045); --line: oklch(0 0 0 / 0.1); --hover: oklch(0 0 0 / 0.07); --sel: oklch(0 0 0 / 0.08);
+  --surface: oklch(0 0 0 / 0.035); --ctl: #fff; --ctl-ring: 0 0 0 1px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06); --ctl-hover: #f6f6f6;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --fg: #fafafa; --fg2: oklch(1 0 0 / 0.55); --fg3: oklch(1 0 0 / 0.3); --field: oklch(1 0 0 / 0.07); --line: oklch(1 0 0 / 0.12); --hover: oklch(1 0 0 / 0.09); --sel: oklch(1 0 0 / 0.11); --surface: oklch(1 0 0 / 0.06); --ctl: oklch(1 0 0 / 0.1); --ctl-ring: 0 0 0 0 transparent; --ctl-hover: oklch(1 0 0 / 0.15); }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--bg); }
+body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); display: flex; overflow: hidden; -webkit-font-smoothing: antialiased; }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+button, select, input { font: inherit; color: var(--fg); }
+button { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 12px; font-weight: 500; white-space: nowrap; transition-property: background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease); }
+@media (hover: hover) { button:not(:disabled):hover { background: var(--ctl-hover); } }
+@media (prefers-reduced-motion: no-preference) { button:not(:disabled):active { scale: 0.96; } }
+button:disabled { opacity: 0.4; }
+button.primary { background: var(--fg); color: var(--bg); box-shadow: none; }
+@media (hover: hover) { button.primary:not(:disabled):hover { background: var(--fg); opacity: 0.85; } }
+select { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px 6px; min-width: 168px; }
+input.text { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px; width: 188px; outline: none; }
+input.text:focus { box-shadow: 0 0 0 1.5px var(--fg2); }
+
+/* ---------- navigation ---------- */
+.nav { width: 224px; flex: none; padding: 24px 12px; display: flex; flex-direction: column; border-inline-end: 1px solid var(--line); overflow-y: auto; }
+.search { display: flex; align-items: center; gap: 8px; height: 32px; padding-inline: 10px; margin-bottom: 16px; border-radius: 8px; background: var(--field); color: var(--fg2); }
+.search:focus-within { box-shadow: inset 0 0 0 1px var(--fg2); }
+.search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; }
+#navlist { display: flex; flex-direction: column; gap: 2px; }
+#navlist a { display: flex; align-items: center; gap: 10px; height: 32px; padding-inline: 10px; border-radius: 8px; color: var(--fg2); text-decoration: none; font-weight: 500; cursor: default; transition-property: background-color, color; transition-duration: 150ms; transition-timing-function: var(--ease); }
+@media (hover: hover) { #navlist a:hover { background: var(--hover); color: var(--fg); } }
+#navlist a[aria-current="page"] { background: var(--sel); color: var(--fg); }
+#navlist a.gap { margin-top: 16px; }
+.nav .foot { margin-top: auto; padding: 16px 10px 0; color: var(--fg3); font-size: 11px; }
+
+/* ---------- content ---------- */
+main { flex: 1; min-width: 0; overflow-y: auto; padding: 40px 40px 72px; }
+.wrap { max-width: 680px; }
+.head { margin-bottom: 24px; }
+.head h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+.head p { color: var(--fg2); margin-top: 4px; }
+.searching .head { display: none; }
+section { display: none; }
+section.on { display: block; }
+@media (prefers-reduced-motion: no-preference) { section.on { animation: in 200ms var(--ease); } }
+@keyframes in { from { opacity: 0; translate: 0 4px; } }
+.searching section.on { display: none; }
+.searching section.hit { display: block; animation: none; }
+section h2 { display: none; font-size: 15px; font-weight: 600; margin: 32px 0 12px; }
+.searching section.hit:first-of-type h2, .searching .hit ~ .hit h2 { display: block; }
+.searching section h2 { display: block; }
+.group { border-radius: 12px; background: var(--surface); margin-bottom: 24px; overflow: hidden; }
+.group-title { font-size: 12px; font-weight: 600; color: var(--fg2); margin: 0 16px 8px; }
+.searching .group-title { display: none; }
+.row { position: relative; display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 56px; }
+.row + .row::before, #tasks .row::before { content: ''; position: absolute; top: 0; inset-inline: 16px 0; height: 1px; background: var(--line); }
+.searching .miss + .row::before { display: none; }
+.row .text { flex: 1; min-width: 0; }
+.row .label { display: block; font-weight: 500; }
+.row p { color: var(--fg2); font-size: 12px; margin-top: 2px; }
+.row .controls { display: flex; gap: 8px; align-items: center; flex: none; }
+.searching .miss { display: none !important; }
+.searching .group:not(:has(> :not(.miss))) { display: none; }
+#empty { display: none; color: var(--fg2); text-align: center; padding: 48px 0; }
+.searching.none #empty { display: block; }
+.switch { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 11px; background: var(--hover); position: relative; flex: none; transition: background-color 150ms var(--ease); }
+.switch::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); transition: translate 150ms var(--ease); }
+.switch:checked { background: var(--fg); }
+.switch:checked::after { translate: 16px 0; }
+.switch:disabled { opacity: 0.4; }
+.ok { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+code.cmd { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--field); font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; }
+
+/* theme tiles */
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; }
+.theme { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: center; font-weight: 500; }
+.theme input { position: absolute; opacity: 0; pointer-events: none; }
+.theme .pv { width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); overflow: hidden; display: flex; transition: box-shadow 150ms var(--ease); }
+.theme input:checked + .pv { box-shadow: 0 0 0 2px var(--fg); }
+.theme input:focus-visible + .pv { outline: 2px solid var(--fg); outline-offset: 3px; }
+.pv .sb { width: 30%; padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; }
+.pv .sb b { display: block; height: 5px; border-radius: 3px; }
+.pv .pg { flex: 1; margin: 6px 6px 6px 0; border-radius: 4px; }
+.pv.light { background: #fff; } .pv.light .sb b { background: #0001; } .pv.light .sb b:first-child { background: #0002; } .pv.light .pg { background: #f3f3f3; box-shadow: 0 0 0 1px #0001; }
+.pv.dark { background: #000; } .pv.dark .sb b { background: #fff2; } .pv.dark .sb b:first-child { background: #fff3; } .pv.dark .pg { background: #161616; box-shadow: 0 0 0 1px #fff1; }
+.pv.system { background: linear-gradient(90deg, #fff 50%, #000 50%); }
+.pv.system .sb b { background: #0002; } .pv.system .pg { background: linear-gradient(90deg, #f3f3f3 calc(50% - 6px), #161616 calc(50% - 6px)); }
+
+/* memory meter */
+.meter { padding: 20px 16px 16px; }
+.meter .big { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.meter .sub { color: var(--fg2); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin-top: 16px; gap: 2px; }
+.bar i { display: block; height: 100%; transition: width 400ms var(--ease); }
+.bar i:nth-child(1) { background: var(--fg); } .bar i:nth-child(2) { background: var(--fg2); } .bar i:nth-child(3) { background: var(--fg3); } .bar i:nth-child(4) { background: var(--line); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 11.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; background: var(--c); }
+.task .label { font-weight: 400; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.task p { font-variant-numeric: tabular-nums; }
+
+/* navigation rows */
+button.row { width: 100%; height: auto; border-radius: 0; background: none; box-shadow: none; text-align: start; font-weight: 400; white-space: normal; }
+@media (hover: hover) { button.row:hover { background: var(--hover); } }
+@media (prefers-reduced-motion: no-preference) { button.row:active { scale: 1; } }
+.tile { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--fg); color: var(--bg); flex: none; }
+button.row .chev { color: var(--fg3); }
+.row:has(.tile) + .row::before { inset-inline-start: 60px; }
+.about { color: var(--fg2); font-size: 12px; line-height: 1.7; }
+
+@media (max-width: 680px) {
+  body { flex-direction: column; overflow: auto; }
+  .nav { width: auto; border-inline-end: 0; border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  #navlist { flex-direction: row; flex-wrap: wrap; }
+  .search { margin-bottom: 8px; }
+  .nav .foot { display: none; }
+  main { overflow: visible; padding: 24px 16px 48px; }
+  .row { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<aside class="nav" aria-label="Settings sections">
+  <label class="search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><input id="q" type="search" placeholder="Search settings" aria-label="Search settings" spellcheck="false" autocomplete="off"></label>
+  <nav id="navlist"></nav>
+  <div class="foot" id="foot"></div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="head"><h1 id="h-title">Settings</h1><p id="h-sub"></p></div>
+
+  <section data-id="general" data-title="General" data-sub="Startup, search and your default browser.">
+    <h2>General</h2>
+    <div class="group">
+      <div class="row"><div class="text"><span class="label">Default browser</span><p id="default-note">Open links from other apps in rzen.</p></div><span id="default-ok" class="ok" hidden>✓ Default</span><button id="make-default" class="primary">Make default</button></div>
+      <div class="row"><div class="text"><label class="label" for="startup">On startup</label><p>What rzen opens when it starts.</p></div><select id="startup" data-key="startup"><option value="restore">Reopen all tabs</option><option value="fresh">Keep pinned tabs only</option></select></div>
+      <div class="row"><div class="text"><label class="label" for="search">Search engine</label><p>Used by the address bar and command bar.</p></div><select id="search" data-key="search_engine"></select></div>
+    </div>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="mini">Mini player</label><p>Shows what's playing in the sidebar, and keeps the video there when you switch tabs.</p></div><input type="checkbox" role="switch" class="switch" id="mini"></div>
+    </div>
+  </section>
+
+  <section data-id="profile" data-title="Profile" data-sub="Who's browsing, and how it's protected.">
+    <h2>Profile</h2>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="p-name">Name</label><p>Each profile has its own tabs, history, settings and website logins.</p></div><input class="text" id="p-name" autocomplete="nickname" spellcheck="false"></div>
+      <div class="row"><div class="text"><label class="label" for="p-pass">Password</label><p id="p-pass-note"></p></div><div class="controls"><input class="text" id="p-pass" type="password" autocomplete="new-password" placeholder="New password" style="width:150px"><button id="p-pass-save">Save</button></div></div>
+    </div>
+  </section>
+
+  <section data-id="appearance" data-title="Appearance" data-sub="Light, dark, or match your Mac.">
+    <h2>Appearance</h2>
+    <div class="group">
+      <div class="themes" role="radiogroup" aria-label="Theme">
+        <label class="theme"><input type="radio" name="theme" value="system"><span class="pv system" aria-hidden="true"><span class="sb"><b></b><b></b><b></b></span><span class="pg"></span></span>System</label>
+        <label class="theme"><input type="radio" name="theme" value="light"><span class="pv light" aria-hidden="true"><span class="sb"><b></b><b></b><b></b></span><span class="pg"></span></span>Light</label>
+        <label class="theme"><input type="radio" name="theme" value="dark"><span class="pv dark" aria-hidden="true"><span class="sb"><b></b><b></b><b></b></span><span class="pg"></span></span>Dark</label>
+      </div>
+    </div>
+    <div class="group">
+      <button class="row" data-page="rzen://boosts"><span class="tile"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 2.5L7.2 8.8M6.3 9.7a2 2 0 0 0-2.8 0c-.8.8-.5 2.3-1.5 3.3 1.7.5 3.4.2 4.3-.7a2 2 0 0 0 0-2.6z"/></svg></span><span class="text"><span class="label">Boosts</span><p>Restyle any site with switches or your own CSS and JavaScript, like a calmer YouTube.</p></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+    </div>
+  </section>
+
+  <section data-id="ai" data-title="AI" data-sub="The AI panel, rzen AI, and agent access.">
+    <h2>AI</h2>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="ai-provider">AI panel</label><p>Opens beside your page with ⇧⌘A.</p></div><select id="ai-provider" data-key="ai_provider"></select></div>
+      <div class="row"><div class="text"><label class="label" for="ai-model-sel">rzen AI model</label><p>Opus is the most capable; Sonnet and Haiku are faster.</p></div><select id="ai-model-sel" data-key="ai_model"></select></div>
+      <div class="row"><div class="text"><span class="label">Claude API key</span><p id="ai-key-note"></p></div><button id="ai-key-remove">Remove</button></div>
+    </div>
+    <div class="group-title">Agents</div>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="agent">Let AI agents use rzen</label><p>Agents like Claude Code can open pages, read, click and type. This Mac only, protected by a private key. A badge shows while one is active.</p><code class="cmd" id="agent-cmd" hidden></code></div><input type="checkbox" role="switch" class="switch" id="agent"></div>
+    </div>
+  </section>
+
+  <section data-id="privacy" data-title="Privacy & Security" data-sub="Tracking, passkeys and your browsing data.">
+    <h2>Privacy &amp; Security</h2>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="block">Block trackers and ads</label><p id="block-note">Uses Safari's native content-blocking engine.</p></div><input type="checkbox" role="switch" class="switch" id="block"></div>
+      <div class="row"><div class="text"><span class="label">Filter lists</span><p id="shield-note">EasyList, EasyPrivacy, Peter Lowe's and uBlock filters, refreshed every few days.</p></div><button id="shield-refresh">Update lists</button></div>
+      <div class="row"><div class="text"><span class="label">Passkeys</span><p id="passkey-note"></p></div></div>
+    </div>
+    <div class="group-title">Browsing data</div>
+    <div class="group">
+      <div class="row"><div class="text"><span class="label">History</span><p id="history-note"></p></div><button data-confirm="clearHistory">Clear history</button></div>
+      <div class="row"><div class="text"><span class="label">Cookies and site data</span><p>Signs you out of websites.</p></div><button data-confirm="clearData">Clear data</button></div>
+      <div class="row"><div class="text"><span class="label">Page cache</span><p>Cached images and files. Logins stay.</p></div><button class="cache-clear">Clear cache</button></div>
+    </div>
+  </section>
+
+  <section data-id="memory" data-title="Memory" data-sub="What rzen uses right now, and how it saves memory.">
+    <h2>Memory</h2>
+    <div class="group">
+      <div class="meter">
+        <div class="big" id="mem-total">–</div>
+        <div class="sub" id="mem-sub">Measuring…</div>
+        <div class="bar" aria-hidden="true"><i id="b-pages"></i><i id="b-browser"></i><i id="b-gpu"></i><i id="b-net"></i></div>
+        <div class="legend"><span style="--c: var(--fg)" id="l-pages">Pages</span><span style="--c: var(--fg2)" id="l-browser">Browser</span><span style="--c: var(--fg3)" id="l-gpu">GPU</span><span style="--c: var(--line)" id="l-net">Network</span></div>
+      </div>
+      <div id="tasks" aria-label="Loaded tabs"></div>
+    </div>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="memlimit">Memory limit</label><p>Above this, rzen unloads the tabs you used least recently. The tab you're on, Essentials and anything playing stay loaded.</p></div><select id="memlimit" data-key="memory_limit_mb" data-num><option value="768">768 MB</option><option value="1024">1 GB</option><option value="1536">1.5 GB</option><option value="2048">2 GB</option><option value="3072">3 GB</option><option value="0">No limit</option></select></div>
+      <div class="row"><div class="text"><label class="label" for="unload">Unload inactive tabs</label><p>Frees a tab's memory; it reloads when you return.</p></div><select id="unload" data-key="unload_after_minutes" data-num><option value="5">After 5 minutes</option><option value="10">After 10 minutes</option><option value="20">After 20 minutes</option><option value="30">After 30 minutes</option><option value="60">After 1 hour</option><option value="0">Never</option></select></div>
+      <div class="row"><div class="text"><label class="label" for="maxlive">Tabs kept in memory</label><p id="live-note"></p></div><select id="maxlive" data-key="max_live_tabs" data-num><option value="4">4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option><option value="16">16</option><option value="24">24</option></select></div>
+    </div>
+  </section>
+
+  <section data-id="net" data-title="Network" data-sub="Speed, DNS, proxies and VPN.">
+    <h2>Network</h2>
+    <div class="group">
+      <button class="row" data-page="rzen://speedtest"><span class="tile"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 11.5a5.5 5.5 0 1 1 11 0"/><path d="M8 11.5l2.6-3.6"/></svg></span><span class="text"><span class="label">Speed Test</span><p>Download, upload, latency and jitter, live.</p></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+      <button class="row" data-page="rzen://dns"><span class="tile"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6"/></svg></span><span class="text"><span class="label">DNS</span><p>Race resolvers, look up domains, encrypt DNS.</p></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+    </div>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="sysdns-pick">DNS for this Mac</label><p id="dns-note">Checking your DNS…</p></div><div class="controls"><select id="sysdns-pick" style="min-width:132px"><option value="automatic">Automatic</option></select><button id="sysdns-apply">Apply</button></div></div>
+      <div class="row"><div class="text"><label class="label" for="dns-pick">Encrypted DNS profile</label><p>DNS over HTTPS for every app. macOS 26 sometimes refuses these profiles; if it does, use DNS for this Mac above.</p><input class="text" id="dns-custom" placeholder="https://dns.nextdns.io/your-id" spellcheck="false" aria-label="Custom DNS-over-HTTPS URL" style="width:100%;margin-top:8px" hidden></div><div class="controls"><select id="dns-pick" style="min-width:132px"></select><button id="dns-install">Install</button></div></div>
+      <div class="row"><div class="text"><span class="label">DNS cache</span><p>Fixes sites that moved or won't load. macOS asks for your password.</p></div><button class="dns-flush">Flush</button></div>
+      <div class="row"><div class="text"><span class="label">Page cache</span><p>Clears cached files. Logins stay.</p></div><button class="cache-clear">Clear</button></div>
+    </div>
+    <div class="group-title">Proxy and VPN</div>
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="proxy-kind">Proxy</label><p>Route rzen through SOCKS5 or HTTP, such as Tor (127.0.0.1:9050) or your VPN provider's proxy.</p></div><div class="controls"><select id="proxy-kind" style="min-width:92px"><option value="">Off</option><option value="socks5">SOCKS5</option><option value="http">HTTP</option></select><input class="text" id="proxy-addr" placeholder="host:port" spellcheck="false" aria-label="Proxy address" style="width:124px"><button id="proxy-apply">Apply</button></div></div>
+      <div class="row"><div class="text"><span class="label">Mac VPN</span><p id="mac-vpn">Checking…</p></div><button id="vpn-open">VPN settings</button></div>
+    </div>
+  </section>
+
+  <section data-id="downloads" data-title="Downloads" data-sub="Where downloaded files go.">
+    <h2>Downloads</h2>
+    <div class="group">
+      <div class="row"><div class="text"><span class="label">Save files to</span><p id="dl-path"></p></div><button id="open-dl">Open folder</button></div>
+    </div>
+  </section>
+
+  <section data-id="about" data-title="About rzen" data-sub="A fast, memory-lean browser.">
+    <h2>About</h2>
+    <div class="group"><div class="row"><div class="text about" id="about"></div></div></div>
+  </section>
+
+  <div id="empty">No settings match your search.</div>
+</div>
+</main>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const send = (o) => window.ipc.postMessage(JSON.stringify(o));
+  const ICONS = {
+    general: '<circle cx="8" cy="8" r="2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+    profile: '<circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5a5 5 0 0 1 10 0"/>',
+    appearance: '<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11z" fill="currentColor"/>',
+    ai: '<path d="M8 1.8l1.6 4.6 4.6 1.6-4.6 1.6L8 14.2 6.4 9.6 1.8 8l4.6-1.6z"/>',
+    privacy: '<path d="M8 1.8l5 2v4c0 3-2.2 5.3-5 6.4-2.8-1.1-5-3.4-5-6.4v-4z"/>',
+    memory: '<rect x="3" y="4" width="10" height="8" rx="1.5"/><path d="M5.5 4V2.5M8 4V2.5M10.5 4V2.5M5.5 13.5V12M8 13.5V12M10.5 13.5V12"/>',
+    net: '<circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6"/>',
+    downloads: '<path d="M8 2.5v8M5 7.5l3 3 3-3"/><path d="M3 13.5h10"/>',
+    about: '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v4M8 4.8v.1"/>',
+  };
+  const svg = (k) => '<svg viewBox="0 0 16 16" aria-hidden="true">' + ICONS[k] + '</svg>';
+  const sections = $$('section');
+  const nav = $('#navlist');
+  const q = $('#q');
+  const GAP = new Set(['ai', 'privacy', 'about']);
+  for (const s of sections) {
+    const a = document.createElement('a');
+    if (GAP.has(s.dataset.id)) a.className = 'gap';
+    a.href = '#' + s.dataset.id;
+    a.dataset.id = s.dataset.id;
+    a.innerHTML = svg(s.dataset.id) + '<span></span>';
+    a.lastChild.textContent = s.dataset.title;
+    a.addEventListener('click', (e) => { e.preventDefault(); focus(s.dataset.id); });
+    nav.append(a);
+  }
+  let current = 'general';
+  function show(id) {
+    current = id;
+    const s = sections.find((x) => x.dataset.id === id);
+    for (const x of sections) x.classList.toggle('on', x === s);
+    for (const a of nav.children) a.dataset.id === id ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
+    $('#h-title').textContent = s.dataset.title;
+    $('#h-sub').textContent = s.dataset.sub;
+    $('main').scrollTop = 0;
+  }
+  function focus(id) {
+    if (!sections.some((s) => s.dataset.id === id)) return;
+    q.value = '';
+    search('');
+    show(id);
+  }
+  // Search filters rows across every section and shows the matches together.
+  function search(text) {
+    const t = text.trim().toLowerCase();
+    document.body.classList.toggle('searching', !!t);
+    let any = false;
+    for (const s of sections) {
+      let hit = false;
+      for (const r of s.querySelectorAll('.row, .themes, .meter')) {
+        const m = !t || (s.dataset.title + ' ' + r.textContent).toLowerCase().includes(t);
+        r.classList.toggle('miss', !m);
+        hit ||= m;
+      }
+      s.classList.toggle('hit', !!t && hit);
+      any ||= hit;
+    }
+    document.body.classList.toggle('none', !!t && !any);
+  }
+  q.addEventListener('input', () => search(q.value));
+  q.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && q.value) { e.preventDefault(); focus(current); }
+    if (e.key === 'Enter') { const hit = sections.find((s) => s.classList.contains('hit')); if (hit) focus(hit.dataset.id); }
+  });
+  // ⌘F jumps to search.
+  addEventListener('keydown', (e) => { if (e.metaKey && e.key === 'f') { e.preventDefault(); q.focus(); q.select(); } });
+  show(current);
+
+  // ---------- controls ----------
+  for (const sel of $$('select[data-key]')) {
+    sel.addEventListener('change', () => send({ t: 'set', key: sel.dataset.key, value: 'num' in sel.dataset ? Number(sel.value) : sel.value }));
+  }
+  $('#block').addEventListener('change', (e) => send({ t: 'set', key: 'block_trackers', value: e.target.checked }));
+  $('#agent').addEventListener('change', (e) => send({ t: 'set', key: 'agent_enabled', value: e.target.checked }));
+  $('#mini').addEventListener('change', (e) => send({ t: 'set', key: 'mini_player', value: e.target.checked }));
+  for (const r of $$('input[name="theme"]')) r.addEventListener('change', () => send({ t: 'set', key: 'theme', value: r.value }));
+  $('#make-default').addEventListener('click', () => send({ t: 'makeDefault' }));
+  $('#open-dl').addEventListener('click', () => send({ t: 'openDownloads' }));
+  $('#ai-key-remove').addEventListener('click', () => send({ t: 'aiKeyRemove' }));
+  for (const b of $$('.cache-clear')) b.addEventListener('click', () => send({ t: 'clearCache' }));
+  for (const b of $$('.dns-flush')) b.addEventListener('click', () => send({ t: 'flushDns' }));
+  for (const b of $$('[data-page]')) b.addEventListener('click', () => send({ t: 'openPage', url: b.dataset.page }));
+  $('#vpn-open').addEventListener('click', () => send({ t: 'openVpnSettings' }));
+  $('#shield-refresh').addEventListener('click', () => send({ t: 'refreshFilters' }));
+  $('#dns-install').addEventListener('click', () => send({ t: 'installDns', provider: $('#dns-pick').value, custom: $('#dns-custom').value || null }));
+  $('#dns-pick').addEventListener('change', (e) => { $('#dns-custom').hidden = e.target.value !== 'custom'; });
+  $('#sysdns-apply').addEventListener('click', () => send({ t: 'setSystemDns', provider: $('#sysdns-pick').value }));
+  $('#proxy-apply').addEventListener('click', () => {
+    const kind = $('#proxy-kind').value, addr = $('#proxy-addr').value.trim();
+    send({ t: 'set', key: 'proxy', value: kind && addr ? kind + '://' + addr : '' });
+  });
+  const pname = $('#p-name');
+  pname.addEventListener('change', () => { if (pname.value.trim()) send({ t: 'profileName', name: pname.value }); });
+  $('#p-pass-save').addEventListener('click', () => { send({ t: 'profilePassword', password: $('#p-pass').value }); $('#p-pass').value = ''; });
+  // Destructive actions take a second click instead of a modal.
+  for (const b of $$('[data-confirm]')) {
+    const label = b.textContent;
+    let timer = 0;
+    b.addEventListener('click', () => {
+      if (b.dataset.armed) { clearTimeout(timer); delete b.dataset.armed; b.textContent = label; send({ t: b.dataset.confirm }); }
+      else { b.dataset.armed = '1'; b.textContent = 'Click again to confirm'; timer = setTimeout(() => { delete b.dataset.armed; b.textContent = label; }, 3000); }
+    });
+  }
+  const fmt = (mb) => (mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : Math.round(mb) + ' MB');
+  const tasks = $('#tasks');
+  tasks.addEventListener('click', (e) => { const b = e.target.closest('button[data-id]'); if (b) send({ t: 'unload', id: +b.dataset.id }); });
+  let netAsked = false;
+
+  window.__settings = {
+    focus,
+    load(d) {
+      const s = d.settings;
+      if (d.profile) {
+        if (document.activeElement !== pname) pname.value = d.profile.name;
+        $('#p-pass-note').textContent = d.profile.hasPassword ? 'Locked with a password (⌃⌘L locks now). Save an empty field to remove it.' : 'Optional. Locks this profile when rzen opens or when you press ⌃⌘L.';
+      }
+      const se = $('#search');
+      if (!se.options.length) { for (const e of d.engines) se.add(new Option(e.name, e.id)); if (!d.engines.some((e) => e.id === s.search_engine)) se.add(new Option('Custom', s.search_engine)); }
+      se.value = s.search_engine;
+      $('#startup').value = s.startup;
+      $('#unload').value = String(s.unload_after_minutes);
+      $('#maxlive').value = String(s.max_live_tabs);
+      $('#mini').checked = s.mini_player !== false;
+      const ml = $('#memlimit');
+      if (![...ml.options].some((o) => o.value === String(s.memory_limit_mb))) ml.add(new Option(Math.round(s.memory_limit_mb) + ' MB', s.memory_limit_mb));
+      ml.value = String(s.memory_limit_mb);
+      for (const r of $$('input[name="theme"]')) r.checked = r.value === s.theme;
+      const block = $('#block');
+      block.checked = s.block_trackers;
+      if (d.platform !== 'macos') { block.disabled = true; $('#block-note').textContent = 'Not yet available on this platform.'; }
+      const sh = d.shields;
+      if (sh) {
+        const busy = { downloading: 'Downloading lists…', converting: 'Converting lists…', compiling: 'Compiling rules…' }[sh.state];
+        const when = sh.updated ? new Date(sh.updated * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        $('#shield-note').textContent = busy || (sh.error ? 'Update failed: ' + sh.error
+          : sh.state === 'ready' ? sh.rules.toLocaleString() + ' rules from ' + sh.lists + ' lists' + (when ? ' · updated ' + when : '')
+          : 'Using the built-in list until the filter lists download.');
+        $('#shield-refresh').disabled = !!busy || !s.block_trackers;
+      }
+      $('#default-ok').hidden = d.isDefault !== true;
+      $('#make-default').hidden = d.isDefault === true;
+      $('#make-default').disabled = d.isDefault == null;
+      $('#default-note').textContent = d.isDefault == null ? 'Available when running the installed rzen app.' : 'Open links from other apps in rzen.';
+      $('#passkey-note').textContent = d.passkeys ? 'Available. Sign in with Touch ID, your iPhone, or a security key.' : "Needs the signed rzen build (Apple's browser entitlement). Until then, sites ask for your password and a code instead.";
+      $('#history-note').textContent = d.history === 1 ? '1 site visited' : d.history.toLocaleString() + ' sites visited';
+      $('#live-note').textContent = d.live + ' of ' + d.total + ' tabs are in memory right now.';
+      $('#dl-path').textContent = d.downloads || '';
+      const aip = $('#ai-provider');
+      if (!aip.options.length) for (const p of d.aiProviders) aip.add(new Option(p.name, p.id));
+      aip.value = s.ai_provider;
+      const aim = $('#ai-model-sel');
+      if (!aim.options.length) for (const m of d.aiModels) aim.add(new Option(m.name, m.id));
+      aim.value = s.ai_model;
+      $('#ai-key-note').textContent = d.aiKey ? 'Saved in your Keychain. Used only for requests to Anthropic.' : 'Not connected. Open the AI panel (⇧⌘A) to connect.';
+      $('#ai-key-remove').hidden = !d.aiKey;
+      $('#agent').checked = d.agent.enabled;
+      $('#agent-cmd').hidden = !d.agent.enabled;
+      $('#agent-cmd').textContent = d.agent.command;
+      const dp = $('#dns-pick');
+      if (!dp.options.length) for (const p of d.dnsProviders) dp.add(new Option(p.name, p.id));
+      const sp = $('#sysdns-pick');
+      if (sp.options.length === 1) for (const p of d.dnsProviders) if (p.ips.length) sp.add(new Option(p.name, p.id));
+      const m = (s.proxy || '').match(/^(socks5|http):\/\/(.+)$/i);
+      if (document.activeElement !== $('#proxy-addr')) { $('#proxy-kind').value = m ? m[1].toLowerCase() : ''; $('#proxy-addr').value = m ? m[2] : ''; }
+      const about = $('#about');
+      about.textContent = '';
+      for (const l of ['rzen ' + d.version, d.engine ? 'WebKit ' + d.engine : '', 'Pages render with WebKit, the engine behind Safari.'].filter(Boolean)) { const div = document.createElement('div'); div.textContent = l; about.append(div); }
+      $('#foot').textContent = 'rzen ' + d.version;
+      if (!netAsked) { netAsked = true; send({ t: 'netInfo' }); }
+    },
+    perf(p) {
+      $('#mem-total').textContent = fmt(p.total);
+      $('#mem-sub').textContent = p.live + ' of ' + p.count + ' tabs loaded · CPU ' + Math.round(p.cpu) + '%' + (p.pressure >= 2 ? ' · Memory pressure: keeping 3 tabs loaded' : '');
+      $('#live-note').textContent = p.live + ' of ' + p.count + ' tabs are in memory right now.';
+      for (const [k, v, label] of [['pages', p.pages, 'Pages (' + p.pageProcs + ')'], ['browser', p.browser, 'Browser'], ['gpu', p.gpu, 'GPU'], ['net', p.network, 'Network']]) {
+        $('#b-' + k).style.width = (p.total ? (v / p.total) * 100 : 0) + '%';
+        $('#l-' + k).textContent = label + ' ' + fmt(v);
+      }
+      tasks.textContent = '';
+      for (const t of p.tabs) {
+        const row = document.createElement('div');
+        row.className = 'row task';
+        const text = document.createElement('div');
+        text.className = 'text';
+        const label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = t.title;
+        const meta = document.createElement('p');
+        meta.textContent = fmt(t.mb) + ' · ' + Math.round(t.cpu) + '% CPU' + (t.visible ? ' · Showing' : '');
+        text.append(label, meta);
+        row.append(text);
+        if (!t.visible) { const b = document.createElement('button'); b.textContent = 'Unload'; b.dataset.id = t.id; b.setAttribute('aria-label', 'Unload ' + t.title); row.append(b); }
+        tasks.append(row);
+      }
+      if (q.value) search(q.value);
+    },
+    net(n) {
+      $('#dns-note').textContent = (n.dns.length ? 'Now: ' + n.dns.join(', ') : 'Now: automatic') + (n.encrypted ? ' (encrypted)' : '') + '. macOS asks for your password to change it.';
+      $('#mac-vpn').textContent = n.vpn ? 'Connected: ' + n.vpn : 'No VPN connected on this Mac.';
+    },
+  };
+  send({ t: 'get' });
+})();
+</script>
+</body>
+</html>
