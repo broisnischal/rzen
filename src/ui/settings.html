@@ -6,104 +6,115 @@
 <style>
 :root {
   color-scheme: light dark;
-  --bg: #fff; --fg: #0a0a0a; --fg2: oklch(0 0 0 / 0.55); --fg3: oklch(0 0 0 / 0.32);
+  --bg: #fff; --fg: #0a0a0a; --fg2: oklch(0 0 0 / 0.55); --fg3: oklch(0 0 0 / 0.32); --fg4: oklch(0 0 0 / 0.16);
   --field: oklch(0 0 0 / 0.045); --line: oklch(0 0 0 / 0.1); --hover: oklch(0 0 0 / 0.07); --sel: oklch(0 0 0 / 0.08);
   --surface: oklch(0 0 0 / 0.035); --ctl: #fff; --ctl-ring: 0 0 0 1px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06); --ctl-hover: #f6f6f6;
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #000; --fg: #fafafa; --fg2: oklch(1 0 0 / 0.55); --fg3: oklch(1 0 0 / 0.3); --field: oklch(1 0 0 / 0.07); --line: oklch(1 0 0 / 0.12); --hover: oklch(1 0 0 / 0.09); --sel: oklch(1 0 0 / 0.11); --surface: oklch(1 0 0 / 0.06); --ctl: oklch(1 0 0 / 0.1); --ctl-ring: 0 0 0 0 transparent; --ctl-hover: oklch(1 0 0 / 0.15); }
+  :root { --bg: #000; --fg: #fafafa; --fg2: oklch(1 0 0 / 0.55); --fg3: oklch(1 0 0 / 0.3); --fg4: oklch(1 0 0 / 0.16); --field: oklch(1 0 0 / 0.07); --line: oklch(1 0 0 / 0.12); --hover: oklch(1 0 0 / 0.09); --sel: oklch(1 0 0 / 0.11); --surface: oklch(1 0 0 / 0.06); --ctl: oklch(1 0 0 / 0.1); --ctl-ring: 0 0 0 0 transparent; --ctl-hover: oklch(1 0 0 / 0.15); }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
 html, body { height: 100%; background: var(--bg); }
-body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); display: flex; overflow: hidden; -webkit-font-smoothing: antialiased; }
+body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); display: flex; overflow: hidden; }
 svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 :focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 button, select, input { font: inherit; color: var(--fg); }
-button { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 12px; font-weight: 500; white-space: nowrap; transition-property: background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease); }
+button { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 32px; padding-inline: 12px; font-weight: 500; white-space: nowrap; transition-property: background-color, opacity, scale; transition-duration: 150ms; transition-timing-function: var(--ease); }
 @media (hover: hover) { button:not(:disabled):hover { background: var(--ctl-hover); } }
 @media (prefers-reduced-motion: no-preference) { button:not(:disabled):active { scale: 0.96; } }
 button:disabled { opacity: 0.4; }
 button.primary { background: var(--fg); color: var(--bg); box-shadow: none; }
 @media (hover: hover) { button.primary:not(:disabled):hover { background: var(--fg); opacity: 0.85; } }
-select { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px 6px; min-width: 168px; }
-input.text { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px; width: 188px; outline: none; }
-input.text:focus { box-shadow: 0 0 0 1.5px var(--fg2); }
+select { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 32px; padding-inline: 10px 6px; min-width: 168px; }
+input.text { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 32px; padding-inline: 10px; width: 168px; }
 
 /* ---------- navigation ---------- */
-.nav { width: 224px; flex: none; padding: 24px 12px; display: flex; flex-direction: column; border-inline-end: 1px solid var(--line); overflow-y: auto; }
-.search { display: flex; align-items: center; gap: 8px; height: 32px; padding-inline: 10px; margin-bottom: 16px; border-radius: 8px; background: var(--field); color: var(--fg2); }
-.search:focus-within { box-shadow: inset 0 0 0 1px var(--fg2); }
+.nav { width: 224px; flex: none; padding: 40px 12px 24px; display: flex; flex-direction: column; border-inline-end: 1px solid var(--line); overflow-y: auto; }
+.search { display: flex; align-items: center; gap: 8px; height: 32px; padding-inline: 10px; margin-block-end: 16px; border-radius: 8px; background: var(--field); color: var(--fg2); }
+.search:focus-within { outline: 2px solid var(--fg); outline-offset: 2px; }
 .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; }
 #navlist { display: flex; flex-direction: column; gap: 2px; }
 #navlist a { display: flex; align-items: center; gap: 10px; height: 32px; padding-inline: 10px; border-radius: 8px; color: var(--fg2); text-decoration: none; font-weight: 500; cursor: default; transition-property: background-color, color; transition-duration: 150ms; transition-timing-function: var(--ease); }
 @media (hover: hover) { #navlist a:hover { background: var(--hover); color: var(--fg); } }
 #navlist a[aria-current="page"] { background: var(--sel); color: var(--fg); }
-#navlist a.gap { margin-top: 16px; }
-.nav .foot { margin-top: auto; padding: 16px 10px 0; color: var(--fg3); font-size: 11px; }
+#navlist a.gap { margin-block-start: 16px; }
+.nav .foot { margin-block-start: auto; padding-block-start: 16px; padding-inline: 10px; color: var(--fg3); font-size: 12px; }
 
 /* ---------- content ---------- */
 main { flex: 1; min-width: 0; overflow-y: auto; padding: 40px 40px 72px; }
 .wrap { max-width: 680px; }
-.head { margin-bottom: 24px; }
-.head h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
-.head p { color: var(--fg2); margin-top: 4px; }
+.head { margin-block-end: 24px; }
+.head h1 { font-size: 24px; font-weight: 600; line-height: calc(32 / 24); letter-spacing: -0.02em; text-wrap: balance; }
+.head p { color: var(--fg2); margin-block-start: 4px; text-wrap: pretty; }
 .searching .head { display: none; }
 section { display: none; }
 section.on { display: block; }
-@media (prefers-reduced-motion: no-preference) { section.on { animation: in 200ms var(--ease); } }
+@media (prefers-reduced-motion: no-preference) { section.on { animation: in 150ms var(--ease); } }
 @keyframes in { from { opacity: 0; translate: 0 4px; } }
 .searching section.on { display: none; }
 .searching section.hit { display: block; animation: none; }
-section h2 { display: none; font-size: 15px; font-weight: 600; margin: 32px 0 12px; }
-.searching section.hit:first-of-type h2, .searching .hit ~ .hit h2 { display: block; }
-.searching section h2 { display: block; }
-.group { border-radius: 12px; background: var(--surface); margin-bottom: 24px; overflow: hidden; }
-.group-title { font-size: 12px; font-weight: 600; color: var(--fg2); margin: 0 16px 8px; }
+section > h2:first-child { display: none; font-size: 15px; font-weight: 600; line-height: 1.3; margin-block: 32px 8px; text-wrap: balance; }
+.searching section > h2:first-child { display: block; }
+.searching section.hit:not(.hit ~ .hit) > h2:first-child { margin-block-start: 0; }
+.group { border-radius: 12px; background: var(--surface); margin-block-end: 24px; overflow: hidden; }
+.group-title { font-size: 12px; font-weight: 600; line-height: 1.3; color: var(--fg2); margin-inline: 16px; margin-block-end: 8px; text-wrap: balance; }
 .searching .group-title { display: none; }
 .row { position: relative; display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 56px; }
-.row + .row::before, #tasks .row::before { content: ''; position: absolute; top: 0; inset-inline: 16px 0; height: 1px; background: var(--line); }
-.searching .miss + .row::before { display: none; }
-.row .text { flex: 1; min-width: 0; }
+.row + .row::before, #tasks .row::before { content: ''; position: absolute; inset-block-start: 0; inset-inline: 16px 0; height: 1px; background: var(--line); }
+.row .text:not(input) { flex: 1; min-width: 0; }
 .row .label { display: block; font-weight: 500; }
-.row p { color: var(--fg2); font-size: 12px; margin-top: 2px; }
+.row p { color: var(--fg2); font-size: 12px; margin-block-start: 2px; text-wrap: pretty; }
+#shield-note, #history-note, #live-note { font-variant-numeric: tabular-nums; }
+#dl-path { overflow-wrap: anywhere; }
 .row .controls { display: flex; gap: 8px; align-items: center; flex: none; }
 .searching .miss { display: none !important; }
-.searching .group:not(:has(> :not(.miss))) { display: none; }
-#empty { display: none; color: var(--fg2); text-align: center; padding: 48px 0; }
+/* While searching, only the first visible row of a group drops its divider. */
+.searching .row::before { display: none; }
+.searching .row:not(.miss) ~ .row:not(.miss)::before, .searching .meter:not(.miss) + #tasks .row:not(.miss)::before { display: block; }
+.searching .group:not(:has(:is(.row, .themes, .meter):not(.miss))) { display: none; }
+#empty { display: none; color: var(--fg2); text-align: center; padding-block: 48px; text-wrap: pretty; }
 .searching.none #empty { display: block; }
-.switch { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 11px; background: var(--hover); position: relative; flex: none; transition: background-color 150ms var(--ease); }
-.switch::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); transition: translate 150ms var(--ease); }
+.switch { appearance: none; -webkit-appearance: none; width: 40px; height: 24px; border-radius: 12px; background: var(--hover); position: relative; flex: none; transition: background-color 150ms var(--ease); }
+.switch::after { content: ''; position: absolute; inset-block-start: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); }
+@media (prefers-reduced-motion: no-preference) { .switch::after { transition-property: translate, background-color; transition-duration: 150ms; transition-timing-function: var(--ease); } }
 .switch:checked { background: var(--fg); }
 .switch:checked::after { translate: 16px 0; }
+.switch:checked:dir(rtl)::after { translate: -16px 0; }
 .switch:disabled { opacity: 0.4; }
-.ok { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
-code.cmd { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--field); font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; }
+@media (prefers-color-scheme: dark) { .switch:not(:checked)::after { background: var(--fg2); box-shadow: none; } }
+.ok { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; white-space: nowrap; }
+code.cmd { display: block; margin-block-start: 8px; padding: 8px 10px; border-radius: 8px; background: var(--field); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; }
 
 /* theme tiles */
 .themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 16px; }
 .theme { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: center; font-weight: 500; }
 .theme input { position: absolute; opacity: 0; pointer-events: none; }
 .theme .pv { width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); overflow: hidden; display: flex; transition: box-shadow 150ms var(--ease); }
+@media (hover: hover) { .theme:hover input:not(:checked) + .pv { box-shadow: 0 0 0 1px var(--fg3); } }
 .theme input:checked + .pv { box-shadow: 0 0 0 2px var(--fg); }
 .theme input:focus-visible + .pv { outline: 2px solid var(--fg); outline-offset: 3px; }
 .pv .sb { width: 30%; padding: 8px 6px; display: flex; flex-direction: column; gap: 4px; }
 .pv .sb b { display: block; height: 5px; border-radius: 3px; }
-.pv .pg { flex: 1; margin: 6px 6px 6px 0; border-radius: 4px; }
+.pv .pg { flex: 1; margin-block: 6px; margin-inline: 0 6px; border-radius: 4px; }
 .pv.light { background: #fff; } .pv.light .sb b { background: #0001; } .pv.light .sb b:first-child { background: #0002; } .pv.light .pg { background: #f3f3f3; box-shadow: 0 0 0 1px #0001; }
 .pv.dark { background: #000; } .pv.dark .sb b { background: #fff2; } .pv.dark .sb b:first-child { background: #fff3; } .pv.dark .pg { background: #161616; box-shadow: 0 0 0 1px #fff1; }
 .pv.system { background: linear-gradient(90deg, #fff 50%, #000 50%); }
 .pv.system .sb b { background: #0002; } .pv.system .pg { background: linear-gradient(90deg, #f3f3f3 calc(50% - 6px), #161616 calc(50% - 6px)); }
 
 /* memory meter */
-.meter { padding: 20px 16px 16px; }
-.meter .big { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.meter .sub { color: var(--fg2); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin-top: 16px; gap: 2px; }
-.bar i { display: block; height: 100%; transition: width 400ms var(--ease); }
-.bar i:nth-child(1) { background: var(--fg); } .bar i:nth-child(2) { background: var(--fg2); } .bar i:nth-child(3) { background: var(--fg3); } .bar i:nth-child(4) { background: var(--line); }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 11.5px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.meter { padding: 16px; }
+.meter .big { font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.meter .sub { color: var(--fg2); font-size: 12px; margin-block-start: 2px; font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin-block-start: 16px; gap: 2px; }
+.bar i { display: block; height: 100%; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width 400ms var(--ease); } }
+.bar i:nth-child(1) { background: var(--fg); } .bar i:nth-child(2) { background: var(--fg2); } .bar i:nth-child(3) { background: var(--fg3); } .bar i:nth-child(4) { background: var(--fg4); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-block-start: 12px; font-size: 12px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.legend span { white-space: nowrap; }
 .legend span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; background: var(--c); }
 .task .label { font-weight: 400; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .task p { font-variant-numeric: tabular-nums; }
@@ -111,17 +122,22 @@ code.cmd { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 8p
 /* navigation rows */
 button.row { width: 100%; height: auto; border-radius: 0; background: none; box-shadow: none; text-align: start; font-weight: 400; white-space: normal; }
 @media (hover: hover) { button.row:hover { background: var(--hover); } }
+button.row:active { background: var(--sel); }
 @media (prefers-reduced-motion: no-preference) { button.row:active { scale: 1; } }
+/* The group clips overflow, so the ring sits inside the row. */
+button.row:focus-visible { outline-offset: -2px; border-radius: 12px; }
 .tile { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--fg); color: var(--bg); flex: none; }
 button.row .chev { color: var(--fg3); }
+.chev:dir(rtl) { scale: -1 1; }
 .row:has(.tile) + .row::before { inset-inline-start: 60px; }
 .about { color: var(--fg2); font-size: 12px; line-height: 1.7; }
 
 @media (max-width: 680px) {
   body { flex-direction: column; overflow: auto; }
-  .nav { width: auto; border-inline-end: 0; border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  .nav { width: auto; border-inline-end: 0; border-block-end: 1px solid var(--line); padding: 16px; }
   #navlist { flex-direction: row; flex-wrap: wrap; }
-  .search { margin-bottom: 8px; }
+  #navlist a.gap { margin-block-start: 0; }
+  .search { margin-block-end: 8px; }
   .nav .foot { display: none; }
   main { overflow: visible; padding: 24px 16px 48px; }
   .row { flex-wrap: wrap; }
@@ -129,9 +145,10 @@ button.row .chev { color: var(--fg3); }
 </style>
 </head>
 <body>
-<aside class="nav" aria-label="Settings sections">
+<aside class="nav">
   <label class="search"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><input id="q" type="search" placeholder="Search settings" aria-label="Search settings" spellcheck="false" autocomplete="off"></label>
-  <nav id="navlist"></nav>
+  <p class="sr" id="search-status" role="status"></p>
+  <nav id="navlist" aria-label="Settings sections"></nav>
   <div class="foot" id="foot"></div>
 </aside>
 <main>
@@ -141,12 +158,12 @@ button.row .chev { color: var(--fg3); }
   <section data-id="general" data-title="General" data-sub="Startup, search and your default browser.">
     <h2>General</h2>
     <div class="group">
-      <div class="row"><div class="text"><span class="label">Default browser</span><p id="default-note">Open links from other apps in rzen.</p></div><span id="default-ok" class="ok" hidden>✓ Default</span><button id="make-default" class="primary">Make default</button></div>
+      <div class="row"><div class="text"><span class="label">Default browser</span><p id="default-note">Open links from other apps in rzen.</p></div><span id="default-ok" class="ok" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>Default</span><button id="make-default" class="primary">Make default</button></div>
       <div class="row"><div class="text"><label class="label" for="startup">On startup</label><p>What rzen opens when it starts.</p></div><select id="startup" data-key="startup"><option value="restore">Reopen all tabs</option><option value="fresh">Keep pinned tabs only</option></select></div>
       <div class="row"><div class="text"><label class="label" for="search">Search engine</label><p>Used by the address bar and command bar.</p></div><select id="search" data-key="search_engine"></select></div>
     </div>
     <div class="group">
-      <div class="row"><div class="text"><label class="label" for="mini">Mini player</label><p>Shows what's playing in the sidebar, and keeps the video there when you switch tabs.</p></div><input type="checkbox" role="switch" class="switch" id="mini"></div>
+      <div class="row"><div class="text"><label class="label" for="mini">Mini player</label><p id="mini-note">Shows what's playing in the sidebar, and keeps the video there when you switch tabs.</p></div><input type="checkbox" role="switch" class="switch" id="mini" aria-describedby="mini-note"></div>
     </div>
   </section>
 
@@ -154,7 +171,7 @@ button.row .chev { color: var(--fg3); }
     <h2>Profile</h2>
     <div class="group">
       <div class="row"><div class="text"><label class="label" for="p-name">Name</label><p>Each profile has its own tabs, history, settings and website logins.</p></div><input class="text" id="p-name" autocomplete="nickname" spellcheck="false"></div>
-      <div class="row"><div class="text"><label class="label" for="p-pass">Password</label><p id="p-pass-note"></p></div><div class="controls"><input class="text" id="p-pass" type="password" autocomplete="new-password" placeholder="New password" style="width:150px"><button id="p-pass-save">Save</button></div></div>
+      <div class="row"><div class="text"><label class="label" for="p-pass">Password</label><p id="p-pass-note"></p></div><div class="controls"><input class="text" id="p-pass" type="password" autocomplete="new-password" placeholder="New password" style="width:150px"><button id="p-pass-save" aria-label="Save password">Save</button></div></div>
     </div>
   </section>
 
@@ -177,22 +194,22 @@ button.row .chev { color: var(--fg3); }
     <div class="group">
       <div class="row"><div class="text"><label class="label" for="ai-provider">AI panel</label><p>Opens beside your page with ⇧⌘A.</p></div><select id="ai-provider" data-key="ai_provider"></select></div>
       <div class="row"><div class="text"><label class="label" for="ai-model-sel">rzen AI model</label><p>Opus is the most capable; Sonnet and Haiku are faster.</p></div><select id="ai-model-sel" data-key="ai_model"></select></div>
-      <div class="row"><div class="text"><span class="label">Claude API key</span><p id="ai-key-note"></p></div><button id="ai-key-remove">Remove</button></div>
+      <div class="row"><div class="text"><span class="label">Claude API key</span><p id="ai-key-note"></p></div><button id="ai-key-remove" aria-label="Remove Claude API key">Remove</button></div>
     </div>
-    <div class="group-title">Agents</div>
+    <h2 class="group-title">Agents</h2>
     <div class="group">
-      <div class="row"><div class="text"><label class="label" for="agent">Let AI agents use rzen</label><p>Agents like Claude Code can open pages, read, click and type. This Mac only, protected by a private key. A badge shows while one is active.</p><code class="cmd" id="agent-cmd" hidden></code></div><input type="checkbox" role="switch" class="switch" id="agent"></div>
+      <div class="row"><div class="text"><label class="label" for="agent">Let AI agents use rzen</label><p id="agent-note">Agents like Claude Code can open pages, read, click and type. This Mac only, protected by a private key. A badge shows while one is active.</p><code class="cmd" id="agent-cmd" hidden></code></div><input type="checkbox" role="switch" class="switch" id="agent" aria-describedby="agent-note"></div>
     </div>
   </section>
 
   <section data-id="privacy" data-title="Privacy & Security" data-sub="Tracking, passkeys and your browsing data.">
     <h2>Privacy &amp; Security</h2>
     <div class="group">
-      <div class="row"><div class="text"><label class="label" for="block">Block trackers and ads</label><p id="block-note">Uses Safari's native content-blocking engine.</p></div><input type="checkbox" role="switch" class="switch" id="block"></div>
-      <div class="row"><div class="text"><span class="label">Filter lists</span><p id="shield-note">EasyList, EasyPrivacy, Peter Lowe's and uBlock filters, refreshed every few days.</p></div><button id="shield-refresh">Update lists</button></div>
+      <div class="row"><div class="text"><label class="label" for="block">Block trackers and ads</label><p id="block-note">Uses Safari's native content-blocking engine.</p></div><input type="checkbox" role="switch" class="switch" id="block" aria-describedby="block-note"></div>
+      <div class="row"><div class="text"><span class="label">Filter lists</span><p id="shield-note" role="status">EasyList, EasyPrivacy, Peter Lowe's and uBlock filters, refreshed every few days.</p></div><button id="shield-refresh">Update lists</button></div>
       <div class="row"><div class="text"><span class="label">Passkeys</span><p id="passkey-note"></p></div></div>
     </div>
-    <div class="group-title">Browsing data</div>
+    <h2 class="group-title">Browsing data</h2>
     <div class="group">
       <div class="row"><div class="text"><span class="label">History</span><p id="history-note"></p></div><button data-confirm="clearHistory">Clear history</button></div>
       <div class="row"><div class="text"><span class="label">Cookies and site data</span><p>Signs you out of websites.</p></div><button data-confirm="clearData">Clear data</button></div>
@@ -207,9 +224,9 @@ button.row .chev { color: var(--fg3); }
         <div class="big" id="mem-total">–</div>
         <div class="sub" id="mem-sub">Measuring…</div>
         <div class="bar" aria-hidden="true"><i id="b-pages"></i><i id="b-browser"></i><i id="b-gpu"></i><i id="b-net"></i></div>
-        <div class="legend"><span style="--c: var(--fg)" id="l-pages">Pages</span><span style="--c: var(--fg2)" id="l-browser">Browser</span><span style="--c: var(--fg3)" id="l-gpu">GPU</span><span style="--c: var(--line)" id="l-net">Network</span></div>
+        <div class="legend"><span style="--c: var(--fg)" id="l-pages">Pages</span><span style="--c: var(--fg2)" id="l-browser">Browser</span><span style="--c: var(--fg3)" id="l-gpu">GPU</span><span style="--c: var(--fg4)" id="l-net">Network</span></div>
       </div>
-      <div id="tasks" aria-label="Loaded tabs"></div>
+      <div id="tasks" role="group" aria-label="Loaded tabs"></div>
     </div>
     <div class="group">
       <div class="row"><div class="text"><label class="label" for="memlimit">Memory limit</label><p>Above this, rzen unloads the tabs you used least recently. The tab you're on, Essentials and anything playing stay loaded.</p></div><select id="memlimit" data-key="memory_limit_mb" data-num><option value="768">768 MB</option><option value="1024">1 GB</option><option value="1536">1.5 GB</option><option value="2048">2 GB</option><option value="3072">3 GB</option><option value="0">No limit</option></select></div>
@@ -225,14 +242,14 @@ button.row .chev { color: var(--fg3); }
       <button class="row" data-page="rzen://dns"><span class="tile"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6"/></svg></span><span class="text"><span class="label">DNS</span><p>Race resolvers, look up domains, encrypt DNS.</p></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
     </div>
     <div class="group">
-      <div class="row"><div class="text"><label class="label" for="sysdns-pick">DNS for this Mac</label><p id="dns-note">Checking your DNS…</p></div><div class="controls"><select id="sysdns-pick" style="min-width:132px"><option value="automatic">Automatic</option></select><button id="sysdns-apply">Apply</button></div></div>
-      <div class="row"><div class="text"><label class="label" for="dns-pick">Encrypted DNS profile</label><p>DNS over HTTPS for every app. macOS 26 sometimes refuses these profiles; if it does, use DNS for this Mac above.</p><input class="text" id="dns-custom" placeholder="https://dns.nextdns.io/your-id" spellcheck="false" aria-label="Custom DNS-over-HTTPS URL" style="width:100%;margin-top:8px" hidden></div><div class="controls"><select id="dns-pick" style="min-width:132px"></select><button id="dns-install">Install</button></div></div>
-      <div class="row"><div class="text"><span class="label">DNS cache</span><p>Fixes sites that moved or won't load. macOS asks for your password.</p></div><button class="dns-flush">Flush</button></div>
-      <div class="row"><div class="text"><span class="label">Page cache</span><p>Clears cached files. Logins stay.</p></div><button class="cache-clear">Clear</button></div>
+      <div class="row"><div class="text"><label class="label" for="sysdns-pick">DNS for this Mac</label><p id="dns-note">Checking your DNS…</p></div><div class="controls"><select id="sysdns-pick" style="min-width:132px"><option value="automatic">Automatic</option></select><button id="sysdns-apply" aria-label="Apply DNS for this Mac">Apply</button></div></div>
+      <div class="row"><div class="text"><label class="label" for="dns-pick">Encrypted DNS profile</label><p>DNS over HTTPS for every app. macOS 26 sometimes refuses these profiles; if it does, use DNS for this Mac above.</p><input class="text" id="dns-custom" placeholder="https://dns.nextdns.io/your-id" spellcheck="false" aria-label="Custom DNS-over-HTTPS URL" style="width:100%;margin-top:8px" hidden></div><div class="controls"><select id="dns-pick" style="min-width:132px"></select><button id="dns-install" aria-label="Install encrypted DNS profile">Install</button></div></div>
+      <div class="row"><div class="text"><span class="label">DNS cache</span><p>Fixes sites that moved or won't load. macOS asks for your password.</p></div><button class="dns-flush" aria-label="Flush DNS cache">Flush</button></div>
+      <div class="row"><div class="text"><span class="label">Page cache</span><p>Clears cached files. Logins stay.</p></div><button class="cache-clear" aria-label="Clear page cache">Clear</button></div>
     </div>
-    <div class="group-title">Proxy and VPN</div>
+    <h2 class="group-title">Proxy and VPN</h2>
     <div class="group">
-      <div class="row"><div class="text"><label class="label" for="proxy-kind">Proxy</label><p>Route rzen through SOCKS5 or HTTP, such as Tor (127.0.0.1:9050) or your VPN provider's proxy.</p></div><div class="controls"><select id="proxy-kind" style="min-width:92px"><option value="">Off</option><option value="socks5">SOCKS5</option><option value="http">HTTP</option></select><input class="text" id="proxy-addr" placeholder="host:port" spellcheck="false" aria-label="Proxy address" style="width:124px"><button id="proxy-apply">Apply</button></div></div>
+      <div class="row"><div class="text"><label class="label" for="proxy-kind">Proxy</label><p>Route rzen through SOCKS5 or HTTP, such as Tor (127.0.0.1:9050) or your VPN provider's proxy.</p></div><div class="controls"><select id="proxy-kind" style="min-width:92px"><option value="">Off</option><option value="socks5">SOCKS5</option><option value="http">HTTP</option></select><input class="text" id="proxy-addr" placeholder="host:port" spellcheck="false" aria-label="Proxy address" style="width:124px"><button id="proxy-apply" aria-label="Apply proxy">Apply</button></div></div>
       <div class="row"><div class="text"><span class="label">Mac VPN</span><p id="mac-vpn">Checking…</p></div><button id="vpn-open">VPN settings</button></div>
     </div>
   </section>
@@ -240,7 +257,7 @@ button.row .chev { color: var(--fg3); }
   <section data-id="downloads" data-title="Downloads" data-sub="Where downloaded files go.">
     <h2>Downloads</h2>
     <div class="group">
-      <div class="row"><div class="text"><span class="label">Save files to</span><p id="dl-path"></p></div><button id="open-dl">Open folder</button></div>
+      <div class="row"><div class="text"><span class="label">Save files to</span><p id="dl-path"></p></div><button id="open-dl" aria-label="Open downloads folder">Open folder</button></div>
     </div>
   </section>
 
@@ -272,6 +289,7 @@ button.row .chev { color: var(--fg3); }
   const sections = $$('section');
   const nav = $('#navlist');
   const q = $('#q');
+  const status = $('#search-status');
   const GAP = new Set(['ai', 'privacy', 'about']);
   for (const s of sections) {
     const a = document.createElement('a');
@@ -303,18 +321,22 @@ button.row .chev { color: var(--fg3); }
   function search(text) {
     const t = text.trim().toLowerCase();
     document.body.classList.toggle('searching', !!t);
-    let any = false;
+    let any = false, n = 0;
     for (const s of sections) {
       let hit = false;
       for (const r of s.querySelectorAll('.row, .themes, .meter')) {
         const m = !t || (s.dataset.title + ' ' + r.textContent).toLowerCase().includes(t);
         r.classList.toggle('miss', !m);
         hit ||= m;
+        if (m) n++;
       }
       s.classList.toggle('hit', !!t && hit);
       any ||= hit;
     }
     document.body.classList.toggle('none', !!t && !any);
+    // Announce the result count once per change; perf() re-runs search with the same text.
+    const msg = !t ? '' : any ? n + (n === 1 ? ' result' : ' results') : 'No settings match your search.';
+    if (status.textContent !== msg) status.textContent = msg;
   }
   q.addEventListener('input', () => search(q.value));
   q.addEventListener('keydown', (e) => {
@@ -391,9 +413,11 @@ button.row .chev { color: var(--fg3); }
       if (sh) {
         const busy = { downloading: 'Downloading lists…', converting: 'Converting lists…', compiling: 'Compiling rules…' }[sh.state];
         const when = sh.updated ? new Date(sh.updated * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-        $('#shield-note').textContent = busy || (sh.error ? 'Update failed: ' + sh.error
+        const note = busy || (sh.error ? 'Update failed: ' + sh.error
           : sh.state === 'ready' ? sh.rules.toLocaleString() + ' rules from ' + sh.lists + ' lists' + (when ? ' · updated ' + when : '')
           : 'Using the built-in list until the filter lists download.');
+        // A status region: write only real changes so repeated pushes stay quiet.
+        if ($('#shield-note').textContent !== note) $('#shield-note').textContent = note;
         $('#shield-refresh').disabled = !!busy || !s.block_trackers;
       }
       $('#default-ok').hidden = d.isDefault !== true;
@@ -444,6 +468,7 @@ button.row .chev { color: var(--fg3); }
         const label = document.createElement('span');
         label.className = 'label';
         label.textContent = t.title;
+        label.title = t.title;
         const meta = document.createElement('p');
         meta.textContent = fmt(t.mb) + ' · ' + Math.round(t.cpu) + '% CPU' + (t.visible ? ' · Showing' : '');
         text.append(label, meta);
@@ -458,6 +483,14 @@ button.row .chev { color: var(--fg3); }
       $('#mac-vpn').textContent = n.vpn ? 'Connected: ' + n.vpn : 'No VPN connected on this Mac.';
     },
   };
+  // A theme flip changes every color at once; skip transitions for that frame so it snaps.
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const off = document.createElement('style');
+    off.textContent = '*,*::before,*::after{transition:none!important}';
+    document.head.append(off);
+    document.body.offsetHeight;
+    requestAnimationFrame(() => off.remove());
+  });
   send({ t: 'get' });
 })();
 </script>
