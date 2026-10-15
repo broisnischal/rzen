@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Boosts</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fff; --fg: #0a0a0a; --fg2: oklch(0 0 0 / 0.55); --fg3: oklch(0 0 0 / 0.32);
+  --field: oklch(0 0 0 / 0.045); --line: oklch(0 0 0 / 0.1); --hover: oklch(0 0 0 / 0.07); --sel: oklch(0 0 0 / 0.08);
+  --surface: oklch(0 0 0 / 0.035); --ctl: #fff; --ctl-ring: 0 0 0 1px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06); --ctl-hover: #f6f6f6;
+  --code: #fff;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #000; --fg: #fafafa; --fg2: oklch(1 0 0 / 0.55); --fg3: oklch(1 0 0 / 0.3); --field: oklch(1 0 0 / 0.07); --line: oklch(1 0 0 / 0.12); --hover: oklch(1 0 0 / 0.09); --sel: oklch(1 0 0 / 0.11); --surface: oklch(1 0 0 / 0.06); --ctl: oklch(1 0 0 / 0.1); --ctl-ring: 0 0 0 0 transparent; --ctl-hover: oklch(1 0 0 / 0.15); --code: oklch(1 0 0 / 0.04); }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; background: var(--bg); }
+body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; color: var(--fg); display: flex; overflow: hidden; -webkit-font-smoothing: antialiased; }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+button, select, input, textarea { font: inherit; color: var(--fg); }
+button { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 12px; font-weight: 500; white-space: nowrap; transition-property: background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease); }
+@media (hover: hover) { button:not(:disabled):hover { background: var(--ctl-hover); } }
+@media (prefers-reduced-motion: no-preference) { button:not(:disabled):active { scale: 0.96; } }
+button:disabled { opacity: 0.4; }
+button.primary { background: var(--fg); color: var(--bg); box-shadow: none; }
+@media (hover: hover) { button.primary:not(:disabled):hover { background: var(--fg); opacity: 0.85; } }
+button.icon { width: 30px; padding: 0; display: grid; place-items: center; }
+input.text { background: var(--ctl); box-shadow: var(--ctl-ring); border: 0; border-radius: 8px; height: 30px; padding-inline: 10px; width: 200px; outline: none; }
+input.text:focus { box-shadow: 0 0 0 1.5px var(--fg2); }
+
+/* ---------- list ---------- */
+.nav { width: 248px; flex: none; padding: 24px 12px; display: flex; flex-direction: column; border-inline-end: 1px solid var(--line); overflow-y: auto; }
+.nav-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 10px; margin-bottom: 16px; }
+.nav-head h1 { font-size: 15px; font-weight: 600; }
+#list { display: flex; flex-direction: column; gap: 2px; }
+.item { display: flex; align-items: center; gap: 10px; height: 44px; padding-inline: 10px; border-radius: 8px; background: none; box-shadow: none; text-align: start; font-weight: 400; width: 100%; }
+@media (hover: hover) { .item:not(:disabled):hover { background: var(--hover); } }
+@media (prefers-reduced-motion: no-preference) { .item:not(:disabled):active { scale: 1; } }
+.item[aria-current="true"] { background: var(--sel); }
+.item .t { flex: 1; min-width: 0; }
+.item b { display: block; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.item small { display: block; color: var(--fg2); font-size: 11.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.item.off b { color: var(--fg2); }
+.tile { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; background: var(--fg); color: var(--bg); flex: none; font-weight: 600; font-size: 13px; text-transform: uppercase; }
+.off .tile { background: var(--field); color: var(--fg2); }
+.nav .foot { margin-top: auto; padding: 16px 10px 0; color: var(--fg3); font-size: 11.5px; }
+
+/* ---------- editor ---------- */
+main { flex: 1; min-width: 0; overflow-y: auto; padding: 40px 40px 72px; }
+.wrap { max-width: 680px; }
+.head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.head .t { flex: 1; min-width: 0; }
+.head h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+#name { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; background: none; border: 0; outline: none; width: 100%; padding: 0; border-radius: 6px; }
+#name:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+.head p { color: var(--fg2); margin-top: 4px; }
+.head .controls { display: flex; align-items: center; gap: 8px; padding-top: 4px; flex: none; }
+.group { border-radius: 12px; background: var(--surface); margin-bottom: 24px; overflow: hidden; }
+.group-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; color: var(--fg2); margin: 0 16px 8px; min-height: 24px; }
+.group-title button { height: 24px; padding-inline: 10px; font-size: 12px; }
+.row { position: relative; display: flex; align-items: center; gap: 16px; padding: 12px 16px; min-height: 56px; }
+.row + .row::before { content: ''; position: absolute; top: 0; inset-inline: 16px 0; height: 1px; background: var(--line); }
+.row:has(.tile) + .row::before { inset-inline-start: 60px; }
+.row .text { flex: 1; min-width: 0; }
+.row .label { display: block; font-weight: 500; }
+.row p { color: var(--fg2); font-size: 12px; margin-top: 2px; }
+button.row { width: 100%; height: auto; border-radius: 0; background: none; box-shadow: none; text-align: start; font-weight: 400; white-space: normal; }
+@media (hover: hover) { button.row:hover { background: var(--hover); } }
+@media (prefers-reduced-motion: no-preference) { button.row:active { scale: 1; } }
+button.row .chev { color: var(--fg3); }
+.switch { appearance: none; -webkit-appearance: none; width: 38px; height: 22px; border-radius: 11px; background: var(--hover); position: relative; flex: none; transition: background-color 150ms var(--ease); }
+.switch::after { content: ''; position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); box-shadow: 0 1px 2px oklch(0 0 0 / 0.25); transition: translate 150ms var(--ease); }
+.switch:checked { background: var(--fg); }
+.switch:checked::after { translate: 16px 0; }
+.code { display: block; width: 100%; min-height: 168px; resize: vertical; border: 0; outline: none; background: var(--code); padding: 14px 16px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; white-space: pre; overflow: auto; }
+.code:focus { box-shadow: inset 0 0 0 1.5px var(--fg2); }
+.hint { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; color: var(--fg2); font-size: 12px; border-top: 1px solid var(--line); }
+#saved { color: var(--fg3); font-size: 12px; transition: opacity 300ms var(--ease); }
+.empty-head { margin-bottom: 24px; }
+.empty-head h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.empty-head p { color: var(--fg2); margin-top: 4px; max-width: 52ch; }
+@media (max-width: 680px) {
+  body { flex-direction: column; overflow: auto; }
+  .nav { width: auto; border-inline-end: 0; border-bottom: 1px solid var(--line); padding: 16px; }
+  .nav .foot { display: none; }
+  main { overflow: visible; padding: 24px 16px 48px; }
+  .head { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+<aside class="nav" aria-label="Boosts">
+  <div class="nav-head"><h1>Boosts</h1><button class="icon" id="add" aria-label="New boost" title="New boost"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button></div>
+  <div id="list" role="list"></div>
+  <p class="foot">Your own look for any site. Boosts stay on this Mac and apply as soon as a page starts loading.</p>
+</aside>
+<main>
+<div class="wrap">
+  <section id="start">
+    <div class="empty-head"><h2>Make any site yours</h2><p>A boost restyles a site with switches or your own CSS and JavaScript. Changes show up on open pages right away.</p></div>
+    <div class="group">
+      <button class="row" id="start-yt"><span class="tile" aria-hidden="true">Y</span><span class="text"><span class="label">YouTube</span><p>Hide Shorts, recommendations and comments, clean up the player, go black and white.</p></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+      <div class="row"><span class="tile" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span><div class="text"><label class="label" for="new-host">Another site</label><p>Start with an empty boost and write your own CSS or JavaScript.</p></div><form id="new-form" style="display:flex;gap:8px"><input class="text" id="new-host" placeholder="example.com" spellcheck="false" autocomplete="off" style="width:160px"><button class="primary" type="submit">Create</button></form></div>
+    </div>
+  </section>
+
+  <section id="editor" hidden>
+    <div class="head">
+      <div class="t">
+        <input id="name" aria-label="Boost name" spellcheck="false" autocomplete="off">
+        <p id="sub"></p>
+      </div>
+      <div class="controls"><span id="saved" aria-live="polite"></span><input type="checkbox" role="switch" class="switch" id="enabled" aria-label="Boost on"></div>
+    </div>
+
+    <div class="group">
+      <button class="row" id="open"><div class="text"><span class="label" id="open-label">Open site</span><p>Switches to an open tab for this site, or opens one.</p></div><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
+    </div>
+
+    <div id="preset" hidden>
+      <div class="group-title"><span id="preset-title">YouTube</span><span style="display:flex;gap:8px"><button id="p-min">Minimal</button><button id="p-none">All off</button></span></div>
+      <div class="group" id="options"></div>
+    </div>
+
+    <div class="group-title"><span>Your CSS</span></div>
+    <div class="group">
+      <textarea class="code" id="css" spellcheck="false" aria-label="Your CSS" placeholder="/* Applies on every page of this site. Use !important to win over the site's own styles. */&#10;#sidebar { display: none !important; }"></textarea>
+      <div class="hint"><span>Updates open pages as you type.</span></div>
+    </div>
+
+    <div class="group-title"><span>Your JavaScript</span></div>
+    <div class="group">
+      <textarea class="code" id="js" spellcheck="false" aria-label="Your JavaScript" placeholder="// Runs as each page of this site starts loading, before the site's own scripts.&#10;document.addEventListener('DOMContentLoaded', () => {&#10;  document.title = 'Focus';&#10;});"></textarea>
+      <div class="hint"><span>Code runs on the next page load.</span><button id="reload">Reload site</button></div>
+    </div>
+
+    <div class="group">
+      <div class="row"><div class="text"><label class="label" for="host">Site</label><p>Also applies to its subdomains, like m. or music.</p></div><input class="text" id="host" spellcheck="false" autocomplete="off"></div>
+      <div class="row"><div class="text"><span class="label">Delete boost</span><p>The site goes back to how it looks normally.</p></div><button id="delete">Delete</button></div>
+    </div>
+  </section>
+</div>
+</main>
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const send = (o) => window.ipc.postMessage(JSON.stringify(o));
+  const H = '{display:none!important}';
+
+  // YouTube's switches. Selectors target YouTube's own element names, which it keeps stable;
+  // each option is independent, so one going stale never breaks the others.
+  const PRESETS = {
+    youtube: {
+      title: 'YouTube',
+      minimal: ['hide_shorts', 'hide_home', 'hide_related', 'hide_comments', 'clean_player', 'hide_chips', 'quiet_header', 'mono'],
+      options: [
+        { id: 'hide_shorts', label: 'Hide Shorts', desc: 'Removes Shorts shelves, tabs and links. A Shorts link opens as a normal video.',
+          css: 'ytd-reel-shelf-renderer,ytd-rich-shelf-renderer[is-shorts],ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model),grid-shelf-view-model:has(ytm-shorts-lockup-view-model),ytd-guide-entry-renderer:has(a[title="Shorts"]),ytd-mini-guide-entry-renderer[aria-label="Shorts"],ytd-video-renderer:has(a[href^="/shorts/"]),ytd-grid-video-renderer:has(a[href^="/shorts/"]),ytd-rich-item-renderer:has(a[href^="/shorts/"]),yt-tab-shape[tab-title="Shorts"]' + H,
+          js: "const rzenShorts=()=>{const m=location.pathname.match(/^\\/shorts\\/([\\w-]+)/);if(m)location.replace('/watch?v='+m[1])};rzenShorts();document.addEventListener('yt-navigate-finish',rzenShorts);" },
+        { id: 'hide_home', label: 'Hide the home feed', desc: 'YouTube opens to a calm page. Search, subscriptions and your library still work.',
+          css: 'ytd-browse[page-subtype="home"] ytd-rich-grid-renderer' + H },
+        { id: 'hide_related', label: 'Hide recommended videos', desc: 'No column of suggestions next to the video.',
+          css: '#related,ytd-watch-next-secondary-results-renderer' + H },
+        { id: 'hide_comments', label: 'Hide comments', desc: 'Nothing below the video description.',
+          css: 'ytd-comments#comments,#comments' + H },
+        { id: 'clean_player', label: 'Clean player', desc: 'No end-screen cards, info cards, branding or pause overlays.',
+          css: '.ytp-ce-element,.ytp-endscreen-content,.ytp-cards-teaser,.ytp-cards-button,.ytp-pause-overlay,.ytp-pause-overlay-container,.ytp-watermark,.iv-branding,.ytp-suggested-action,.ytp-featured-product,.ytp-paid-content-overlay' + H },
+        { id: 'no_autoplay', label: 'Turn off autoplay', desc: 'The next video never starts by itself.',
+          js: "const rzenAuto=()=>{const b=document.querySelector('.ytp-autonav-toggle-button[aria-checked=\"true\"]');if(b)b.click()};document.addEventListener('yt-navigate-finish',()=>{setTimeout(rzenAuto,1500);setTimeout(rzenAuto,5000)});" },
+        { id: 'hide_chips', label: 'Hide topic chips', desc: 'Drops the row of topic filters above feeds and suggestions.',
+          css: 'ytd-feed-filter-chip-bar-renderer,#chips-wrapper,yt-related-chip-cloud-renderer' + H },
+        { id: 'quiet_header', label: 'Quiet header', desc: 'Hides Create, voice search and notifications.',
+          css: 'ytd-masthead #voice-search-button,ytd-masthead ytd-notification-topbar-button-renderer,ytd-masthead ytd-button-renderer:has(a[href^="/upload"]),ytd-masthead ytd-button-renderer:has(button[aria-label="Create"]),ytd-masthead ytd-topbar-menu-button-renderer:has(button[aria-label="Create"])' + H },
+        { id: 'simple_sidebar', label: 'Simpler sidebar', desc: 'Drops Explore, More from YouTube and the footer links.',
+          css: 'ytd-guide-section-renderer:has(a[href^="/feed/explore"]),ytd-guide-section-renderer:has(a[href^="/feed/trending"]),ytd-guide-section-renderer:has(a[href^="/premium"]),ytd-guide-section-renderer:has(a[href*="youtubekids"]),ytd-guide-renderer #footer' + H },
+        { id: 'mono', label: 'Black and white', desc: 'Grey thumbnails and avatars, and a white progress bar instead of red.',
+          css: 'ytd-thumbnail img,yt-thumbnail-view-model img,ytd-playlist-thumbnail img,ytd-moving-thumbnail-renderer img,yt-image img,yt-img-shadow img,yt-avatar-shape img,.yt-spec-avatar-shape img,#avatar img,ytd-video-preview video,ytd-topbar-logo-renderer yt-icon,#logo-icon,.yt-spec-icon-badge-shape__badge{filter:grayscale(1)!important}.ytp-play-progress,.ytp-swatch-background-color,ytd-thumbnail-overlay-resume-playback-renderer #progress{background:#fff!important}' },
+      ],
+    },
+  };
+  const presetFor = (host) => (host === 'youtube.com' || host.endsWith('.youtube.com') ? 'youtube' : '');
+
+  let boosts = [], current = null, currentHost = null, timer = 0;
+  const cur = () => boosts.find((b) => b.id === current);
+
+  // What actually runs: the chosen switches plus your own code.
+  function build(b) {
+    const p = PRESETS[b.preset];
+    const opts = p ? p.options.filter((o) => b.options.includes(o.id)) : [];
+    b.run_css = [...opts.map((o) => o.css || ''), b.css].filter((s) => s.trim()).join('\n');
+    b.run_js = [...opts.map((o) => o.js || ''), b.js].filter((s) => s.trim()).join('\n;\n');
+    return b;
+  }
+  function save(b, now) {
+    build(b);
+    clearTimeout(timer);
+    $('#saved').textContent = 'Saving…';
+    const go = () => { timer = 0; send({ t: 'boostSave', boost: b }); $('#saved').textContent = 'Saved'; };
+    if (now) go(); else timer = setTimeout(go, 300);
+    renderList();
+  }
+
+  function renderList() {
+    const list = $('#list');
+    list.textContent = '';
+    for (const b of boosts) {
+      const el = document.createElement('button');
+      el.className = 'item' + (b.enabled ? '' : ' off');
+      el.setAttribute('role', 'listitem');
+      el.setAttribute('aria-current', String(b.id === current));
+      const tile = document.createElement('span'); tile.className = 'tile'; tile.setAttribute('aria-hidden', 'true'); tile.textContent = (b.host[0] || '•');
+      const t = document.createElement('span'); t.className = 't';
+      const n = document.createElement('b'); n.textContent = b.name || b.host;
+      const s = document.createElement('small'); s.textContent = b.host + (b.enabled ? '' : ' · Off');
+      t.append(n, s); el.append(tile, t);
+      el.addEventListener('click', () => select(b.id));
+      list.append(el);
+    }
+  }
+
+  function renderEditor() {
+    const b = cur();
+    $('#start').hidden = !!b;
+    $('#editor').hidden = !b;
+    if (!b) { suggestHost(); return; }
+    $('#name').value = b.name;
+    $('#host').value = b.host;
+    $('#enabled').checked = b.enabled;
+    $('#css').value = b.css;
+    $('#js').value = b.js;
+    $('#open-label').textContent = 'Open ' + b.host;
+    $('#reload').textContent = 'Reload ' + b.host;
+    $('#sub').textContent = (b.enabled ? 'On' : 'Off') + ' for ' + b.host + ' and its subdomains';
+    $('#saved').textContent = '';
+    const p = PRESETS[b.preset];
+    $('#preset').hidden = !p;
+    const box = $('#options');
+    box.textContent = '';
+    if (p) {
+      $('#preset-title').textContent = p.title;
+      for (const o of p.options) {
+        const row = document.createElement('div'); row.className = 'row';
+        const text = document.createElement('div'); text.className = 'text';
+        const label = document.createElement('label'); label.className = 'label'; label.htmlFor = 'o-' + o.id; label.textContent = o.label;
+        const desc = document.createElement('p'); desc.textContent = o.desc;
+        text.append(label, desc);
+        const sw = document.createElement('input'); sw.type = 'checkbox'; sw.className = 'switch'; sw.setAttribute('role', 'switch'); sw.id = 'o-' + o.id;
+        sw.checked = b.options.includes(o.id);
+        sw.addEventListener('change', () => {
+          b.options = sw.checked ? [...new Set([...b.options, o.id])] : b.options.filter((x) => x !== o.id);
+          save(b, true);
+        });
+        row.append(text, sw); box.append(row);
+      }
+    }
+  }
+
+  function select(id) { current = id; renderList(); renderEditor(); }
+
+  function suggestHost() {
+    const input = $('#new-host');
+    if (document.activeElement !== input && !input.value && currentHost && !boosts.some((b) => b.host === currentHost)) input.value = currentHost;
+  }
+
+  function create(host) {
+    host = (host || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#:]/)[0];
+    if (!host || !/^[a-z0-9.-]+$/.test(host) || !(host.includes('.') || host === 'localhost')) { $('#new-host').focus(); return; }
+    const existing = boosts.find((b) => b.host === host);
+    if (existing) { select(existing.id); return; }
+    const preset = presetFor(host);
+    const b = { id: Date.now(), name: preset ? PRESETS[preset].title : host, host, enabled: true, preset, options: preset ? ['hide_shorts', 'clean_player', 'mono'] : [], css: '', js: '', run_css: '', run_js: '' };
+    boosts.push(b);
+    select(b.id);
+    save(b, true);
+    if (!preset) $('#css').focus();
+  }
+
+  // ---------- editor events ----------
+  $('#add').addEventListener('click', () => { current = null; renderList(); renderEditor(); $('#new-host').focus(); });
+  $('#start-yt').addEventListener('click', () => create('youtube.com'));
+  $('#new-form').addEventListener('submit', (e) => { e.preventDefault(); create($('#new-host').value); $('#new-host').value = ''; });
+  $('#name').addEventListener('input', () => { const b = cur(); b.name = $('#name').value; save(b); });
+  $('#enabled').addEventListener('change', () => { const b = cur(); b.enabled = $('#enabled').checked; save(b, true); renderEditor(); });
+  $('#css').addEventListener('input', () => { const b = cur(); b.css = $('#css').value; save(b); });
+  $('#js').addEventListener('input', () => { const b = cur(); b.js = $('#js').value; save(b); });
+  $('#host').addEventListener('change', () => {
+    const b = cur(), host = $('#host').value.trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#:]/)[0];
+    if (!host) { $('#host').value = b.host; return; }
+    b.host = host; save(b, true); renderEditor();
+  });
+  $('#p-min').addEventListener('click', () => { const b = cur(); b.options = [...PRESETS[b.preset].minimal]; save(b, true); renderEditor(); });
+  $('#p-none').addEventListener('click', () => { const b = cur(); b.options = []; save(b, true); renderEditor(); });
+  $('#open').addEventListener('click', () => send({ t: 'boostOpen', id: current }));
+  $('#reload').addEventListener('click', () => { if (timer) { clearTimeout(timer); send({ t: 'boostSave', boost: build(cur()) }); } send({ t: 'boostReload', id: current }); });
+  const del = $('#delete');
+  let armed = 0;
+  del.addEventListener('click', () => {
+    if (!armed) { del.textContent = 'Click again to delete'; armed = setTimeout(() => { armed = 0; del.textContent = 'Delete'; }, 3000); return; }
+    clearTimeout(armed); armed = 0; del.textContent = 'Delete';
+    send({ t: 'boostDelete', id: current });
+    boosts = boosts.filter((b) => b.id !== current);
+    current = null; renderList(); renderEditor();
+  });
+  // Tab indents in the code editors instead of leaving them.
+  for (const ta of [$('#css'), $('#js')]) {
+    ta.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab' || e.shiftKey || e.metaKey || e.ctrlKey) return;
+      e.preventDefault();
+      document.execCommand('insertText', false, '  ');
+    });
+  }
+
+  window.__boosts = { create };
+  window.__settings = {
+    load(d) {
+      currentHost = d.currentHost || null;
+      const incoming = d.boosts || [];
+      // Keep the boost being edited as typed; everything else follows rzen.
+      const editing = cur();
+      boosts = incoming.map((b) => (editing && b.id === editing.id ? editing : b));
+      if (editing && !boosts.some((b) => b.id === editing.id) && timer) boosts.push(editing);
+      if (current === null && boosts.length && !$('#start').contains(document.activeElement)) current = null;
+      renderList();
+      if (!editing || !boosts.some((b) => b.id === current)) renderEditor();
+    },
+  };
+  renderList();
+  renderEditor();
+  send({ t: 'get' });
+})();
+</script>
+</body>
+</html>
