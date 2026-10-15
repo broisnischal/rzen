@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icon.svg" width="128" alt=""></p>
+
 # rzen
 
 A fast, memory-lean, Zen-style browser written in Rust.
@@ -38,3 +40,7 @@ Turn on Settings → AI agents, then register the MCP server, for example with C
 ```sh
 claude mcp add rzen -- /Applications/rzen.app/Contents/MacOS/rzen mcp
 ```
+
+## License
+
+[MIT](LICENSE)
