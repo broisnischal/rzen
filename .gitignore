@@ -1,0 +1,4 @@
+target/
+*.app
+.claude/
+.DS_Store
