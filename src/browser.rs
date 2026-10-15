@@ -786,6 +786,7 @@ impl Browser {
         self.sh.content.set(r);
         if let Some(v) = self.attached_view() {
             let _ = v.set_bounds(r);
+            platform::clip_width(v, None);
         }
         if let Some(v) = &self.ai_view {
             let _ = v.set_bounds(self.ai_rect());
@@ -904,6 +905,7 @@ impl Browser {
         t.last_active = Instant::now();
         if let Some(v) = t.view.as_ref().filter(|v| platform::attached(v, &self.sh.window)) {
             let _ = v.set_bounds(r);
+            platform::clip_width(v, None);
             let _ = v.set_visible(true);
             platform::foreground(v);
             if !self.overlay {
@@ -1854,11 +1856,17 @@ impl Browser {
             // Mid-animation the page keeps its full (compact) width and only moves: moving a
             // view is free for WebKit, resizing forces a reflow. So it reflows once — before
             // sliding when the sidebar closes, after `SidebarDone` when it opens — never per frame.
+            // With the AI panel open the full-width page would slide over it, so it's clipped
+            // at the panel's edge instead (a mask, not a resize: still no reflow).
             Msg::ContentX { x } => {
                 let (w, h) = self.win_size();
-                let r = rect(x, GAP, w - 2.0 * GAP - self.ai_extra(), h - 2.0 * GAP);
+                let ai = self.ai_extra();
+                let r = rect(x, GAP, w - 2.0 * GAP - ai, h - 2.0 * GAP);
                 if let Some(v) = self.attached_view() {
                     let _ = v.set_bounds(r);
+                    if ai > 0.0 {
+                        platform::clip_width(v, Some(w - GAP - ai - x));
+                    }
                 }
             }
             Msg::SidebarDone => self.layout(),

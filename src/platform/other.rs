@@ -33,6 +33,7 @@ pub fn blocker_status() -> crate::filters::FilterStatus {
 }
 pub fn refresh_filters(_force: bool) {}
 pub fn set_chrome_on_top(_chrome: &WebView, _on_top: bool) {}
+pub fn clip_width(_view: &WebView, _width: Option<f64>) {}
 pub fn set_traffic_lights(_window: &Window, _visible: bool) {}
 pub fn copy_text(_text: &str) {}
 pub fn share(_window: &Window, _url: &str, _rect: (f64, f64, f64, f64)) {}
