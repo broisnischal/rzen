@@ -452,6 +452,40 @@ pub fn set_traffic_lights(window: &Window, visible: bool) {
             button.setHidden(!visible);
         }
     }
+    place_traffic_lights(window);
+}
+
+/// Close button centered on the sidebar's icon column (x 26) and on the toolbar row (y 22):
+/// the button's center lands at (x + 7, y - 2).
+pub const TRAFFIC_LIGHT_INSET: (f64, f64) = (19.0, 24.0);
+
+/// AppKit moves the window buttons back to its default corner on events tao doesn't cover
+/// (showing them again, resizes, focus changes), so rzen puts them back itself. Same
+/// placement as tao's inset; idempotent.
+pub fn place_traffic_lights(window: &Window) {
+    place_window_buttons(unsafe { &*(window.ns_window() as *const NSWindow) });
+}
+
+fn place_window_buttons(ns_window: &NSWindow) {
+    let button = |kind| ns_window.standardWindowButton(kind);
+    let (Some(close), Some(mini), Some(zoom)) =
+        (button(NSWindowButton::CloseButton), button(NSWindowButton::MiniaturizeButton), button(NSWindowButton::ZoomButton))
+    else {
+        return;
+    };
+    let Some(bar) = (unsafe { close.superview().and_then(|v| v.superview()) }) else { return };
+    let (x, y) = TRAFFIC_LIGHT_INSET;
+    let close_frame = close.frame();
+    let mut frame = bar.frame();
+    frame.size.height = close_frame.size.height + y;
+    frame.origin.y = ns_window.frame().size.height - frame.size.height;
+    bar.setFrame(frame);
+    let step = mini.frame().origin.x - close_frame.origin.x;
+    for (i, b) in [close, mini, zoom].iter().enumerate() {
+        let mut origin = b.frame().origin;
+        origin.x = x + i as f64 * step;
+        b.setFrameOrigin(origin);
+    }
 }
 
 /// Opens the macOS share sheet for `url`, anchored under the given chrome rect.

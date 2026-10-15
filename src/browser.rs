@@ -522,9 +522,7 @@ impl Browser {
                 .with_titlebar_transparent(true)
                 .with_title_hidden(true)
                 .with_fullsize_content_view(true)
-                // Close button centered on the sidebar's icon column (x 26) and on the toolbar
-                // row (y 22): tao places the button center at (x + 7, y - 2).
-                .with_traffic_light_inset(LogicalPosition::new(19.0, 24.0));
+                .with_traffic_light_inset(LogicalPosition::new(platform::TRAFFIC_LIGHT_INSET.0, platform::TRAFFIC_LIGHT_INSET.1));
         }
         let window = wb.build(event_loop)?;
         platform::set_window_background(&window);
@@ -791,6 +789,7 @@ impl Browser {
         if let Some(v) = &self.ai_view {
             let _ = v.set_bounds(self.ai_rect());
         }
+        platform::place_traffic_lights(&self.sh.window);
     }
 
     fn set_overlay(&mut self, on: bool) {

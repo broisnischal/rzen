@@ -110,7 +110,12 @@ fn main() {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => browser.layout(),
             WindowEvent::Moved(_) => browser.touch(),
-            WindowEvent::Focused(true) => browser.reload_settings(),
+            WindowEvent::Focused(focused) => {
+                if focused {
+                    browser.reload_settings();
+                }
+                browser.layout();
+            }
             WindowEvent::CloseRequested => {
                 browser.shutdown();
                 *control_flow = ControlFlow::Exit;
