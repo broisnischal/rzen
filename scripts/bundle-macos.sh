@@ -35,6 +35,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <!-- A browser must open plain-http sites; without this macOS silently blocks them in web views. -->
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoadsInWebContent</key><true/></dict>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSCameraUsageDescription</key><string>Websites you allow can use the camera for video calls.</string>
   <key>NSMicrophoneUsageDescription</key><string>Websites you allow can use the microphone for calls and voice input.</string>
