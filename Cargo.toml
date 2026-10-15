@@ -3,6 +3,8 @@ name = "rzen"
 version = "0.1.0"
 description = "A fast, memory-lean, Zen-style browser built on the native system engine"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/broisnischal/rzen"
 
 [dependencies]
 dirs = "7"
