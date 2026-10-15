@@ -9,6 +9,17 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp target/release/rzen "$APP/Contents/MacOS/rzen"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# macOS 26 renders the Icon Composer icon with Liquid Glass; older systems use the .icns.
+ICON_NAME=""
+if ACTOOL=$(xcrun --find actool 2>/dev/null); then
+  ICONS=$(mktemp -d)
+  "$ACTOOL" assets/AppIcon.icon --compile "$ICONS" --platform macosx --target-device mac \
+    --minimum-deployment-target 13.0 --app-icon AppIcon \
+    --output-partial-info-plist "$ICONS/partial.plist" >/dev/null
+  cp "$ICONS/Assets.car" "$APP/Contents/Resources/Assets.car"
+  rm -rf "$ICONS"
+  ICON_NAME="<key>CFBundleIconName</key><string>AppIcon</string>"
+fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,6 +30,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>rzen</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
+  ${ICON_NAME}
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
