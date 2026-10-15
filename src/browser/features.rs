@@ -313,13 +313,94 @@ impl Browser {
         }
     }
 
+    // ---------- notifications ----------
+
+    /// Boosts plus the notification shim carrying this profile's per-site decisions.
+    pub(super) fn page_scripts(&self) -> Vec<String> {
+        let mut scripts = crate::boosts::scripts(&self.boosts);
+        if platform::notifications_supported() {
+            scripts.push(platform::NOTIFY_JS.replace("__PERMS__", &json!(self.notify_perms).to_string()));
+        }
+        scripts
+    }
+
+    fn page_view(&self, tab: Id) -> Option<&WebView> {
+        if tab == AI_ID { self.ai_view.as_ref() } else { self.tab(tab).and_then(|t| t.view.as_ref()) }
+    }
+
+    fn notify_reply(&self, tab: Id, req: u64, state: &str) {
+        if let Some(v) = self.page_view(tab) {
+            let _ = v.evaluate_script(&format!("window.__rzenNotify&&__rzenNotify.resolve({req},{})", json!(state)));
+        }
+    }
+
+    /// A page's `Notification` call. `origin` comes from WebKit, never from the page.
+    pub(super) fn on_notify(&mut self, tab: Id, origin: String, msg: &str) {
+        let Ok(m) = serde_json::from_str::<Value>(msg) else { return };
+        let site = util::short_host(&origin).to_string();
+        let s = |k: &str| m[k].as_str().unwrap_or_default();
+        match s("t") {
+            "request" => {
+                let Some(req) = m["id"].as_u64() else { return };
+                match self.notify_perms.get(&origin) {
+                    Some(&allowed) => self.notify_reply(tab, req, if allowed { "granted" } else { "denied" }),
+                    // Only the page in front may ask (a background tab can't put up a prompt).
+                    None if self.visible != Some(tab) && tab != AI_ID => self.notify_reply(tab, req, "default"),
+                    None => {
+                        let p = self.sh.proxy.clone();
+                        platform::ask_notifications(&self.sh.window, &site, move |allowed| {
+                            let _ = p.send_event(UserEvent::NotifyDecided(tab, origin.clone(), req, allowed));
+                        });
+                    }
+                }
+            }
+            "show" if self.notify_perms.get(&origin) == Some(&true) => {
+                platform::show_notification(tab, s("id"), s("key"), &site, s("title"), s("body"), m["silent"].as_bool().unwrap_or(false));
+            }
+            "close" => platform::close_notification(tab, s("key")),
+            _ => {}
+        }
+    }
+
+    pub(super) fn notify_decided(&mut self, tab: Id, origin: String, req: u64, allowed: bool) {
+        if allowed && !self.notify_perms.values().any(|&a| a) {
+            platform::authorize_notifications(&self.sh.proxy);
+        }
+        self.notify_perms.insert(origin.clone(), allowed);
+        model::save_json(&self.dir.join("notifications.json"), &self.notify_perms, true);
+        // New loads get the decision from the shim; open pages of that site hear it now.
+        platform::set_page_scripts(self.page_scripts());
+        let state = if allowed { "granted" } else { "denied" };
+        let update = format!("window.__rzenNotify&&location.origin==={}&&__rzenNotify.perm({})", json!(origin), json!(state));
+        for v in self.tabs.iter().filter(|t| !t.is_internal()).filter_map(|t| t.view.as_ref()).chain(self.ai_view.as_ref()) {
+            platform::apply_page_scripts(v);
+            let _ = v.evaluate_script(&update);
+        }
+        self.notify_reply(tab, req, state);
+    }
+
+    /// Clicking a notification brings its tab forward and tells the page.
+    pub(super) fn notify_click(&mut self, tab: Id, id: &str) {
+        platform::activate_app();
+        if tab == AI_ID {
+            if !self.ai_open {
+                self.set_ai(true);
+            }
+        } else if self.tab(tab).is_some() {
+            self.show(tab);
+        }
+        if let Some(v) = self.page_view(tab) {
+            let _ = v.evaluate_script(&format!("window.__rzenNotify&&__rzenNotify.click({})", json!(id)));
+        }
+    }
+
     // ---------- boosts ----------
 
     /// Saves the Boosts and puts them on every open page: styles change right away, code
     /// on each page's next load.
     pub(super) fn boosts_changed(&mut self) {
         crate::boosts::save(&self.dir, &self.boosts);
-        platform::set_page_scripts(crate::boosts::scripts(&self.boosts));
+        platform::set_page_scripts(self.page_scripts());
         let restyle = crate::boosts::restyle_js(&self.boosts);
         for v in self.tabs.iter().filter(|t| !t.is_internal()).filter_map(|t| t.view.as_ref()) {
             platform::apply_page_scripts(v);

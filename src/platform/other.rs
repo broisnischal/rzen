@@ -34,6 +34,19 @@ pub fn blocker_status() -> crate::filters::FilterStatus {
 pub fn refresh_filters(_force: bool) {}
 pub fn set_chrome_on_top(_chrome: &WebView, _on_top: bool) {}
 pub fn clip_width(_view: &WebView, _width: Option<f64>) {}
+pub fn extend_wry(_chrome: &WebView) {}
+pub fn notifications_supported() -> bool {
+    false
+}
+pub fn init_notifications(_proxy: &tao::event_loop::EventLoopProxy<crate::browser::UserEvent>) {}
+pub fn authorize_notifications(_proxy: &tao::event_loop::EventLoopProxy<crate::browser::UserEvent>) {}
+pub fn show_notification(_tab: crate::model::Id, _id: &str, _key: &str, _site: &str, _title: &str, _body: &str, _silent: bool) {}
+pub fn close_notification(_tab: crate::model::Id, _key: &str) {}
+pub fn activate_app() {}
+pub fn ask_notifications(_window: &Window, _site: &str, done: impl Fn(bool) + 'static) {
+    done(false)
+}
+pub const NOTIFY_JS: &str = "";
 pub fn set_traffic_lights(_window: &Window, _visible: bool) {}
 pub fn place_traffic_lights(_window: &Window) {}
 pub fn copy_text(_text: &str) {}

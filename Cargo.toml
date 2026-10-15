@@ -23,6 +23,7 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 objc2-quartz-core = "0.3"
+objc2-user-notifications = "0.3"
 objc2-web-kit = "0.3"
 security-framework = "3"
 

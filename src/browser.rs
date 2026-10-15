@@ -136,6 +136,14 @@ pub enum UserEvent {
     NetDone(String),
     NetInfo(Value),
     ToolResult(String, Result<Value, String>),
+    /// A page's notification call: (tab, origin as WebKit reports it, message JSON).
+    Notify(Id, String, String),
+    /// The user answered a site's notification prompt: (tab, origin, request id, allowed).
+    NotifyDecided(Id, String, u64, bool),
+    /// A notification was clicked: (tab, page's notification id).
+    NotifyClick(Id, String),
+    /// macOS answered the app-level notification permission request.
+    NotifyAuth(bool),
 }
 
 /// A web view WebKit asked us to create synchronously for `window.open`; adopted as a tab
@@ -460,6 +468,8 @@ pub struct Browser {
     ai_open: bool,
     ai_w: f64,
     ai_view: Option<WebView>,
+    /// Per-site notification decisions (origin → allowed), saved in the profile.
+    notify_perms: HashMap<String, bool>,
     media_next: Instant,
     /// Tab shown in the sidebar's mini player.
     media_tab: Option<Id>,
@@ -504,6 +514,7 @@ impl Browser {
         // Rewrite so new keys show up for hand-editing.
         model::save_json(&settings_path, &settings, true);
         let mut session: Session = model::load_json(&dir.join("session.json"));
+        let notify_perms = model::load_json(&dir.join("notifications.json"));
         if settings.startup == "fresh" {
             session.tabs.retain(|t| t.pinned || t.essential);
         }
@@ -592,6 +603,8 @@ impl Browser {
             })
             .build_as_child(&sh.window)?;
         platform::plain_text_input(&chrome);
+        platform::extend_wry(&chrome);
+        platform::init_notifications(&proxy);
         // Icons stored before this run: make sure every tab's is on disk.
         for href in session.tabs.iter().filter_map(|t| t.favicon.clone()) {
             let p = proxy.clone();
@@ -641,6 +654,7 @@ impl Browser {
             ai_open,
             ai_w,
             ai_view: None,
+            notify_perms,
             media_next: Instant::now(),
             media_tab: None,
             agent: None,
@@ -653,7 +667,7 @@ impl Browser {
             settings_focus: None,
             boost_intent: None,
         };
-        platform::set_page_scripts(crate::boosts::scripts(&b.boosts));
+        platform::set_page_scripts(b.page_scripts());
         b.apply_settings();
         b.layout();
         platform::set_traffic_lights(&b.sh.window, b.sidebar_open);
@@ -1756,6 +1770,14 @@ impl Browser {
                 }
             }
             UserEvent::AiAsk(selection) => self.ai_ask(&selection),
+            UserEvent::Notify(tab, origin, msg) => self.on_notify(tab, origin, &msg),
+            UserEvent::NotifyDecided(tab, origin, req, allowed) => self.notify_decided(tab, origin, req, allowed),
+            UserEvent::NotifyClick(tab, id) => self.notify_click(tab, &id),
+            UserEvent::NotifyAuth(granted) => {
+                if !granted {
+                    self.set_toast("Notifications are off for rzen. Turn them on in System Settings → Notifications.", 6);
+                }
+            }
             UserEvent::ToolResult(call, result) => {
                 let (ok, value) = match result {
                     Ok(v) => (true, v),

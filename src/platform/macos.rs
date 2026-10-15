@@ -33,6 +33,9 @@ use wry::{
     WebViewExtMacOS,
 };
 
+mod web;
+pub use web::*;
+
 use crate::{
     browser::{Popup, Shared, UserEvent, build_tab_view},
     model::Id,
@@ -74,7 +77,10 @@ pub fn tab_builder_ext<'a>(
     private: bool,
 ) -> WebViewBuilder<'a> {
     let b = match tab_config(store, private) {
-        Some(config) => b.with_webview_configuration(config),
+        Some(config) => {
+            add_notify_handler(&*unsafe { config.userContentController() }, id, proxy);
+            b.with_webview_configuration(config)
+        }
         None => b,
     };
     let p = proxy.clone();
