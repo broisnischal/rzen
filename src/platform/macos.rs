@@ -143,6 +143,20 @@ pub fn style_content(view: &WebView) {
     apply_blocker(view);
 }
 
+/// While a page grows (sidebar closing, window resize) WebKit shows the web view's own grey
+/// background where it hasn't painted yet. Fill that with the page's background instead, as
+/// Safari does, so a resize reads as the page reflowing rather than a strip opening up.
+pub fn match_page_background(view: &WebView) {
+    let wk = view.webview();
+    if !wk.respondsToSelector(sel!(_setBackgroundColor:)) {
+        return;
+    }
+    let page: Option<Retained<NSColor>> = unsafe { msg_send![&*wk, underPageBackgroundColor] };
+    if let Some(color) = page {
+        let _: () = unsafe { msg_send![&*wk, _setBackgroundColor: &*color] };
+    }
+}
+
 /// Turns ad and tracker blocking on/off. Rules run in WebKit's content-rule engine (the
 /// native matcher Safari content blockers use): compiled once to bytecode that every page
 /// memory-maps, so no JavaScript runs per request. Lists compiled on an earlier run are

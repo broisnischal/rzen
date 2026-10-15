@@ -797,6 +797,7 @@ impl Browser {
         let r = self.content_rect();
         self.sh.content.set(r);
         if let Some(v) = self.attached_view() {
+            platform::match_page_background(v);
             let _ = v.set_bounds(r);
         }
         if let Some(v) = &self.ai_view {
@@ -1879,6 +1880,7 @@ impl Browser {
                 let (w, h) = self.win_size();
                 let r = rect(x, GAP, w - GAP - self.ai_extra() - x, h - 2.0 * GAP);
                 if let Some(v) = self.attached_view() {
+                    platform::match_page_background(v);
                     let _ = v.set_bounds(r);
                 }
             }

@@ -47,6 +47,7 @@ pub fn ask_notifications(_window: &Window, _site: &str, done: impl Fn(bool) + 's
 }
 pub const NOTIFY_JS: &str = "";
 pub fn set_traffic_lights(_window: &Window, _visible: bool) {}
+pub fn match_page_background(_view: &WebView) {}
 pub fn place_traffic_lights(_window: &Window) {}
 pub fn copy_text(_text: &str) {}
 pub fn share(_window: &Window, _url: &str, _rect: (f64, f64, f64, f64)) {}
