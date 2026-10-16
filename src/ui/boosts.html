@@ -93,7 +93,15 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
 .code { display: block; width: 100%; min-height: 168px; resize: vertical; border: 0; background: var(--code); padding: 16px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; white-space: pre; overflow: auto; }
 .hint { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 8px 16px; color: var(--fg2); font-size: 12px; border-block-start: 1px solid var(--line); }
 #saved { color: var(--fg2); font-size: 12px; }
-.empty-head { margin-block-end: 24px; }
+.empty-head { margin-block-end: 8px; }
+/* ready-made boosts: one card per site, two or three across */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-block-end: 8px; }
+.card { position: relative; height: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; border-radius: 12px; background: var(--surface); box-shadow: none; text-align: start; font-weight: 400; white-space: normal; }
+@media (hover: hover) { .card:not(:disabled):hover { background: var(--hover); } }
+.card > :not(.tile):not(.state) { align-self: stretch; }
+.card .name { display: block; font-weight: 600; }
+.card .desc { display: block; color: var(--fg2); font-size: 12px; margin-block-start: 2px; text-wrap: pretty; }
+.card .state { position: absolute; inset-block-start: 16px; inset-inline-end: 16px; height: 20px; display: flex; align-items: center; padding-inline: 8px; border-radius: 10px; font-size: 12px; font-weight: 500; color: var(--fg2); background: var(--field); }
 .empty-head h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
 .empty-head p { color: var(--fg2); margin-block-start: 4px; max-width: 52ch; text-wrap: pretty; }
 @media (max-width: 680px) {
@@ -115,8 +123,10 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
 <div class="wrap">
   <section id="start">
     <div class="empty-head"><h2>Make any site yours</h2><p>A boost restyles a site with switches or your own CSS and JavaScript. Changes show up on open pages right away.</p></div>
+    <div class="group-title"><h2>Ready-made</h2></div>
+    <div class="gallery" id="gallery"></div>
+    <div class="group-title"><h2>Any other site</h2></div>
     <div class="group">
-      <button class="row" id="start-yt"><span class="tile" aria-hidden="true">Y</span><span class="text"><span class="label">YouTube</span><span class="desc">Hide Shorts, recommendations and comments, clean up the player, go black and white.</span></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
       <div class="row"><span class="tile" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span><div class="text"><label class="label" for="new-host">Another site</label><p>Start with an empty boost and write your own CSS or JavaScript.</p></div><form id="new-form" style="display:flex;gap:8px"><input class="text" id="new-host" placeholder="example.com" spellcheck="false" autocomplete="off" autocapitalize="off" inputmode="url" style="width:160px"><button class="primary" type="submit">Create</button></form></div>
     </div>
   </section>
@@ -135,9 +145,12 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
     </div>
 
     <div id="preset" hidden>
-      <div class="group-title"><h2 id="preset-title">YouTube</h2><span style="display:flex;gap:8px"><button id="p-min">Minimal</button><button id="p-none">All off</button></span></div>
+      <div class="group-title"><h2 id="preset-title">YouTube</h2><span style="display:flex;gap:8px"><button id="p-min">Recommended</button><button id="p-none">All off</button></span></div>
       <div class="group" id="options"></div>
     </div>
+
+    <div class="group-title"><h2>Tools</h2></div>
+    <div class="group" id="tools"></div>
 
     <div class="group-title"><h2>Your CSS</h2></div>
     <div class="group">
@@ -165,12 +178,19 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
   const send = (o) => window.ipc.postMessage(JSON.stringify(o));
   const H = '{display:none!important}';
 
-  // YouTube's switches. Selectors target YouTube's own element names, which it keeps stable;
-  // each option is independent, so one going stale never breaks the others.
+  // Google hides sections by the heading they start with; climbing stops below anything that
+  // holds web results or the page navigation, so only that section goes.
+  const hideSections = (pattern) => `if(location.pathname==='/search'){const re=new RegExp(${JSON.stringify(pattern)}),stop=new Set(['rso','center_col','search','res','rcnt','main']),keeps=(n)=>n.querySelector('a h3,#pnnext,[role="navigation"]');const run=()=>{for(const h of document.querySelectorAll('h1,h2,h3,[role=heading]')){if(!re.test(h.textContent.trim())||h.closest('[data-rzen-hidden]'))continue;let el=h;while(el.parentElement&&el.parentElement!==document.body&&!stop.has(el.parentElement.id)&&!keeps(el.parentElement))el=el.parentElement;if(el===h||el.parentElement===document.body)continue;el.setAttribute('data-rzen-hidden','');el.style.setProperty('display','none','important')}};let q=0;new MutationObserver(()=>{if(!q)q=requestAnimationFrame(()=>{q=0;run()})}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('DOMContentLoaded',run)}`;
+
+  // Built-in switches per site. Selectors use each site's own stable hooks (element names,
+  // data attributes, link targets) and were checked against the live sites; each option is
+  // independent, so one going stale never breaks the others.
   const PRESETS = {
     youtube: {
-      title: 'YouTube',
-      minimal: ['hide_shorts', 'hide_home', 'hide_related', 'hide_comments', 'clean_player', 'hide_chips', 'quiet_header', 'mono'],
+      title: 'YouTube', hosts: ['youtube.com'],
+      blurb: 'No Shorts, recommendations or comments, a clean player, black and white.',
+      defaults: ['hide_shorts', 'clean_player', 'mono'],
+      recommended: ['hide_shorts', 'hide_home', 'hide_related', 'hide_comments', 'clean_player', 'hide_chips', 'quiet_header', 'mono'],
       options: [
         { id: 'hide_shorts', label: 'Hide Shorts', desc: 'Removes Shorts shelves, tabs and links. A Shorts link opens as a normal video.',
           css: 'ytd-reel-shelf-renderer,ytd-rich-shelf-renderer[is-shorts],ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),ytd-rich-section-renderer:has(ytm-shorts-lockup-view-model),grid-shelf-view-model:has(ytm-shorts-lockup-view-model),ytd-guide-entry-renderer:has(a[title="Shorts"]),ytd-mini-guide-entry-renderer[aria-label="Shorts"],ytd-video-renderer:has(a[href^="/shorts/"]),ytd-grid-video-renderer:has(a[href^="/shorts/"]),ytd-rich-item-renderer:has(a[href^="/shorts/"]),yt-tab-shape[tab-title="Shorts"]' + H,
@@ -195,8 +215,118 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
           css: 'ytd-thumbnail img,yt-thumbnail-view-model img,ytd-playlist-thumbnail img,ytd-moving-thumbnail-renderer img,yt-image img,yt-img-shadow img,yt-avatar-shape img,.yt-spec-avatar-shape img,#avatar img,ytd-video-preview video,ytd-topbar-logo-renderer yt-icon,#logo-icon,.yt-spec-icon-badge-shape__badge{filter:grayscale(1)!important}.ytp-play-progress,.ytp-swatch-background-color,ytd-thumbnail-overlay-resume-playback-renderer #progress{background:#fff!important}' },
       ],
     },
+    github: {
+      title: 'GitHub', hosts: ['github.com'],
+      blurb: 'Full-width pages, no Copilot prompts or counters, a grey contribution graph.',
+      defaults: ['wide', 'no_copilot', 'tab4'],
+      recommended: ['wide', 'no_copilot', 'no_counts', 'no_sponsor', 'no_footer', 'tab4', 'mono'],
+      options: [
+        { id: 'wide', label: 'Full-width pages', desc: 'Repositories, code and pull requests use the whole window.',
+          css: '.container-xl,.container-lg,.container-md{max-width:none!important}' },
+        { id: 'no_copilot', label: 'Hide Copilot', desc: 'Removes Copilot buttons, prompts and menu items everywhere.',
+          css: 'a:has(svg.octicon-copilot),button:has(svg.octicon-copilot),[class*="CopilotChat" i],copilot-chat-panel' + H },
+        { id: 'no_counts', label: 'Hide counters', desc: 'No star, fork, watcher, follower or tab counts.',
+          css: '[class*="CounterLabel-CounterLabel"],.Counter,#repo-stars-counter-star,#repo-stars-counter-unstar,#repo-network-counter,a[href$="?tab=followers"] .text-bold,a[href$="?tab=following"] .text-bold' + H },
+        { id: 'no_sponsor', label: 'Hide Sponsor buttons', desc: 'No Sponsor buttons or sponsor sections.',
+          css: 'a[href^="/sponsors/"],a[href*="github.com/sponsors/"]' + H },
+        { id: 'no_footer', label: 'Hide the footer', desc: 'Pages end where the content ends.', css: 'footer.footer' + H },
+        { id: 'tab4', label: 'Tabs as 4 spaces', desc: 'Code indented with tabs lines up like in most editors.', css: '*{tab-size:4!important}' },
+        { id: 'mono', label: 'Black and white', desc: 'Grey contribution graph, language colors, labels and avatars.',
+          css: '.ContributionCalendar-day,.repo-language-color,[class*="Progress-item"],.IssueLabel,.Label,img.avatar,img.avatar-user{filter:grayscale(1)!important}' },
+      ],
+    },
+    x: {
+      title: 'X', hosts: ['x.com', 'twitter.com'],
+      blurb: 'Posts without numbers, no Grok or Premium nags, a quiet right column.',
+      defaults: ['no_counts', 'no_grok', 'no_premium'],
+      recommended: ['no_counts', 'no_views', 'no_grok', 'no_premium', 'no_sidebar', 'mono'],
+      options: [
+        { id: 'no_counts', label: 'Hide numbers', desc: 'No like, repost, reply or follower counts, so posts read on their own.',
+          css: '[data-engagement-action] .x-animated-count-visual,a[href$="/verified_followers"] .font-bold,a[href$="/followers"] .font-bold,a[href$="/following"] .font-bold' + H },
+        { id: 'no_views', label: 'Hide view counts', desc: 'Removes the views button under every post.', css: '[data-engagement-action="generic"]' + H },
+        { id: 'no_grok', label: 'Hide Grok', desc: 'No Grok buttons, links or drawer.',
+          css: 'a[href^="/i/grok"],:is(a,button):has([data-icon="icon-grok-logo"])' + H },
+        { id: 'no_premium', label: 'Hide Premium upsells', desc: 'No Premium, Verified or subscription prompts.',
+          css: 'a[href^="/i/premium"],a[href^="/i/verified"],a[href*="premium_sign_up"]' + H },
+        { id: 'no_sidebar', label: 'Hide the right column', desc: 'No trends, suggestions or search box beside the timeline.', css: 'aside.lg\\:flex' + H },
+        { id: 'mono', label: 'Black and white', desc: 'Grey photos, videos and avatars, and plain verified badges.',
+          css: 'img[src*="pbs.twimg.com"],video,[aria-label="Verified account"]{filter:grayscale(1)!important}' },
+      ],
+    },
+    reddit: {
+      title: 'Reddit', hosts: ['reddit.com'],
+      blurb: 'No ads or side columns, grey media, or the classic old Reddit.',
+      defaults: ['no_ads', 'no_right'],
+      recommended: ['no_ads', 'no_right', 'no_left', 'mono'],
+      options: [
+        { id: 'no_ads', label: 'Hide ads', desc: 'Removes promoted posts and sidebar ads.',
+          css: 'shreddit-ad-post,shreddit-sidebar-ad,shreddit-comments-page-ad,shreddit-dynamic-ad-link,[data-promoted="true"]' + H },
+        { id: 'no_right', label: 'Hide the right column', desc: 'No community info, rules or suggestions beside posts.', css: '#right-sidebar-container' + H },
+        { id: 'no_left', label: 'Hide the left menu', desc: 'More room for posts; your communities are still in search.', css: '#left-sidebar-container,flex-left-nav-container' + H },
+        { id: 'mono', label: 'Black and white', desc: 'Grey images, thumbnails and videos.',
+          css: 'shreddit-post img,shreddit-post video,shreddit-player,shreddit-aspect-ratio img{filter:grayscale(1)!important}' },
+        { id: 'old', label: 'Use old Reddit', desc: 'Opens the classic old.reddit.com layout instead.',
+          js: "if(/^(www\\.)?reddit\\.com$/.test(location.hostname))location.replace('https://old.reddit.com'+location.pathname+location.search+location.hash);" },
+      ],
+    },
+    google: {
+      title: 'Google Search', hosts: ['google.com'],
+      blurb: 'Plain results without AI Overviews, ads or People also ask.',
+      defaults: ['no_ai', 'no_paa', 'no_ads'],
+      recommended: ['no_ai', 'no_paa', 'no_ads'],
+      options: [
+        { id: 'web_only', label: 'Web results only', desc: 'Every search opens Google’s Web view: just links, without AI Overview, videos or panels.',
+          js: "if(location.pathname==='/search'){const u=new URL(location.href);if(!u.searchParams.has('udm')&&!u.searchParams.has('tbm')){u.searchParams.set('udm','14');location.replace(u.href)}}" },
+        { id: 'no_ai', label: 'Hide AI Overview', desc: 'Removes the AI-written summary above the results.', js: hideSections('^AI Overview') },
+        { id: 'no_paa', label: 'Hide People also ask', desc: 'Drops the question boxes and related searches.', js: hideSections('^People also (ask|search for)') },
+        { id: 'no_ads', label: 'Hide sponsored results', desc: 'No ads above or below the results.', css: '#tads,#tadsb,#bottomads,#tvcap' + H },
+        { id: 'mono', label: 'Black and white', desc: 'Grey images, thumbnails and logos in results.', css: '#search img,#rso img,#rhs img{filter:grayscale(1)!important}' },
+      ],
+    },
+    hackernews: {
+      title: 'Hacker News', hosts: ['news.ycombinator.com'],
+      blurb: 'Bigger, calmer type, a black header and an optional dark mode.',
+      defaults: ['readable', 'mono'],
+      recommended: ['readable', 'mono', 'no_scores'],
+      options: [
+        { id: 'readable', label: 'Readable text', desc: 'Larger titles and comments, more line spacing, a comfortable width.',
+          css: '#hnmain{width:min(960px,100%)!important}.titleline{font-size:15px!important;line-height:1.4!important}.subtext,.subline{font-size:12px!important}.commtext{font-size:14px!important;line-height:1.55!important}' },
+        { id: 'mono', label: 'Black header', desc: 'The orange bar turns black, with white links.',
+          css: '#hnmain td[bgcolor="#ff6600"]{background:#000!important}#hnmain td[bgcolor="#ff6600"] a,#hnmain td[bgcolor="#ff6600"] .pagetop{color:#fff!important}#hnmain td[bgcolor="#ff6600"] img{filter:grayscale(1)}' },
+        { id: 'no_scores', label: 'Hide points', desc: 'Judge stories without their vote counts.', css: '.score' + H },
+        { id: 'dark', label: 'Dark mode', desc: 'A black page with soft white text.',
+          css: 'html,body,#hnmain,table{background:#000!important}body,td,.commtext,.titleline a{color:#e6e6e6!important}.subtext,.subtext a,.subline,.subline a,.comhead,.comhead a,.titleline a:visited{color:#8a8a8a!important}textarea,input{background:#111!important;color:#e6e6e6!important}' },
+      ],
+    },
+    wikipedia: {
+      title: 'Wikipedia', hosts: ['wikipedia.org'],
+      blurb: 'Focus on the article: no side columns or banners, book-style text.',
+      defaults: ['no_banners'],
+      recommended: ['focus', 'serif', 'no_banners'],
+      options: [
+        { id: 'focus', label: 'Focus on the article', desc: 'Hides the contents, menu and tools columns beside the text.', css: '.vector-column-start,.vector-column-end' + H },
+        { id: 'wide', label: 'Full width', desc: 'The article uses the whole window.', css: '.mw-page-container{max-width:none!important}' },
+        { id: 'serif', label: 'Book-style text', desc: 'Larger serif type with more line spacing.',
+          css: '.mw-body-content{font-family:"New York",Georgia,serif!important;font-size:1.0625rem!important;line-height:1.7!important}' },
+        { id: 'no_banners', label: 'Hide banners', desc: 'No fundraising or site notices.', css: '#centralNotice,#siteNotice,.cn-fundraising' + H },
+        { id: 'mono', label: 'Black and white images', desc: 'Grey images and maps.', css: '.mw-body-content img{filter:grayscale(1)!important}' },
+      ],
+    },
   };
-  const presetFor = (host) => (host === 'youtube.com' || host.endsWith('.youtube.com') ? 'youtube' : '');
+  const presetFor = (host) => Object.keys(PRESETS).find((k) => PRESETS[k].hosts.some((h) => host === h || host.endsWith('.' + h))) || '';
+
+  // Tools work on any site, with or without a preset. Page-wide filters share one rule on
+  // <html> (never <body>, which would break the site's fixed headers).
+  const TOOLS = [
+    { id: 'tool_dark', label: 'Dark mode', desc: 'Turns a light site dark; photos and videos keep their colors.',
+      filter: 'invert(1) hue-rotate(180deg)', css: ':where(html){background-color:#fff}img,video,picture,canvas,iframe,embed,object{filter:invert(1) hue-rotate(180deg)!important}' },
+    { id: 'tool_gray', label: 'Black and white', desc: 'The whole site in greyscale.', filter: 'grayscale(1)' },
+    { id: 'tool_speed', label: 'Video speed keys', desc: 'S slows down, D speeds up and R resets any video on the site.',
+      js: "(()=>{const box=document.createElement('div');let t=0;const show=(r)=>{box.textContent=(Math.round(r*100)/100)+'×';Object.assign(box.style,{position:'fixed',top:'12px',left:'12px',zIndex:'2147483647',padding:'4px 10px',borderRadius:'8px',background:'#000',color:'#fff',font:'600 13px/1.4 -apple-system,system-ui,sans-serif',pointerEvents:'none',opacity:'1',transition:'opacity .3s'});(document.body||document.documentElement).appendChild(box);clearTimeout(t);t=setTimeout(()=>{box.style.opacity='0'},800)};addEventListener('keydown',(e)=>{if(e.metaKey||e.ctrlKey||e.altKey||e.key.length!==1)return;const el=e.target;if(el&&(el.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;const k=e.key.toLowerCase();if(!'sdr'.includes(k))return;const vs=[...document.querySelectorAll('video')];const v=vs.find((x)=>!x.paused)||vs[0];if(!v)return;v.playbackRate=k==='r'?1:Math.min(4,Math.max(0.25,Math.round((v.playbackRate+(k==='d'?0.25:-0.25))*100)/100));show(v.playbackRate);e.stopPropagation()},true)})();" },
+    { id: 'tool_copy', label: 'Allow copy and right-click', desc: 'Lets you select, copy and right-click on sites that block it.',
+      css: '*{-webkit-user-select:text!important;user-select:text!important}',
+      js: "for(const t of ['copy','contextmenu','selectstart'])addEventListener(t,(e)=>e.stopImmediatePropagation(),true);" },
+  ];
 
   let boosts = [], current = null, currentHost = null, timer = 0;
   const cur = () => boosts.find((b) => b.id === current);
@@ -204,11 +334,13 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
   // What actually runs: the chosen switches plus your own code.
   function build(b) {
     const p = PRESETS[b.preset];
-    const opts = p ? p.options.filter((o) => b.options.includes(o.id)) : [];
-    b.run_css = [...opts.map((o) => o.css || ''), b.css].filter((s) => s.trim()).join('\n');
+    const opts = [...(p ? p.options : []), ...TOOLS].filter((o) => b.options.includes(o.id));
+    const filter = opts.map((o) => o.filter).filter(Boolean).join(' ');
+    b.run_css = [...opts.map((o) => o.css || ''), filter ? 'html{filter:' + filter + '!important}' : '', b.css].filter((s) => s.trim()).join('\n');
     b.run_js = [...opts.map((o) => o.js || ''), b.js].filter((s) => s.trim()).join('\n;\n');
     return b;
   }
+  const switchesOn = (b) => b.options.filter((id) => (PRESETS[b.preset]?.options || []).some((o) => o.id === id) || TOOLS.some((o) => o.id === id)).length;
   function save(b, now) {
     build(b);
     clearTimeout(timer);
@@ -228,7 +360,8 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
       const tile = document.createElement('span'); tile.className = 'tile'; tile.setAttribute('aria-hidden', 'true'); tile.textContent = (b.host[0] || '•');
       const t = document.createElement('span'); t.className = 't';
       const n = document.createElement('b'); n.textContent = b.name || b.host; n.title = n.textContent;
-      const s = document.createElement('small'); s.textContent = b.host + (b.enabled ? '' : ' · Off');
+      const n_on = switchesOn(b);
+      const s = document.createElement('small'); s.textContent = b.host + (b.enabled ? (n_on ? ' · ' + n_on + ' on' : '') : ' · Off');
       t.append(n, s); el.append(tile, t);
       el.addEventListener('click', () => select(b.id));
       list.append(el);
@@ -239,7 +372,7 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
     const b = cur();
     $('#start').hidden = !!b;
     $('#editor').hidden = !b;
-    if (!b) { suggestHost(); return; }
+    if (!b) { suggestHost(); renderGallery(); return; }
     $('#name').value = b.name;
     $('#host').value = b.host;
     $('#enabled').checked = b.enabled;
@@ -251,24 +384,52 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
     $('#saved').textContent = '';
     const p = PRESETS[b.preset];
     $('#preset').hidden = !p;
-    const box = $('#options');
+    if (p) $('#preset-title').textContent = p.title;
+    renderSwitches($('#options'), p ? p.options : [], b);
+    renderSwitches($('#tools'), TOOLS, b);
+  }
+
+  function renderSwitches(box, list, b) {
     box.textContent = '';
-    if (p) {
-      $('#preset-title').textContent = p.title;
-      for (const o of p.options) {
-        const row = document.createElement('div'); row.className = 'row';
-        const text = document.createElement('div'); text.className = 'text';
-        const label = document.createElement('label'); label.className = 'label'; label.htmlFor = 'o-' + o.id; label.textContent = o.label;
-        const desc = document.createElement('p'); desc.textContent = o.desc;
-        text.append(label, desc);
-        const sw = document.createElement('input'); sw.type = 'checkbox'; sw.className = 'switch'; sw.setAttribute('role', 'switch'); sw.id = 'o-' + o.id;
-        sw.checked = b.options.includes(o.id);
-        sw.addEventListener('change', () => {
-          b.options = sw.checked ? [...new Set([...b.options, o.id])] : b.options.filter((x) => x !== o.id);
-          save(b, true);
-        });
-        row.append(text, sw); box.append(row);
+    for (const o of list) {
+      const row = document.createElement('div'); row.className = 'row';
+      const text = document.createElement('div'); text.className = 'text';
+      const label = document.createElement('label'); label.className = 'label'; label.htmlFor = 'o-' + o.id; label.textContent = o.label;
+      const desc = document.createElement('p'); desc.id = 'd-' + o.id; desc.textContent = o.desc;
+      text.append(label, desc);
+      const sw = document.createElement('input'); sw.type = 'checkbox'; sw.className = 'switch'; sw.setAttribute('role', 'switch'); sw.id = 'o-' + o.id;
+      sw.setAttribute('aria-describedby', desc.id);
+      sw.checked = b.options.includes(o.id);
+      sw.addEventListener('change', () => {
+        b.options = sw.checked ? [...new Set([...b.options, o.id])] : b.options.filter((x) => x !== o.id);
+        save(b, true);
+        renderList();
+      });
+      row.append(text, sw); box.append(row);
+    }
+  }
+
+  // Ready-made boosts; ones you already have open in the editor instead of a duplicate.
+  function renderGallery() {
+    const box = $('#gallery');
+    box.textContent = '';
+    for (const [key, p] of Object.entries(PRESETS)) {
+      const have = boosts.find((b) => b.preset === key);
+      const card = document.createElement('button');
+      card.className = 'card';
+      const tile = document.createElement('span'); tile.className = 'tile'; tile.setAttribute('aria-hidden', 'true'); tile.textContent = p.title[0];
+      const t = document.createElement('span');
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = p.title;
+      const desc = document.createElement('span'); desc.className = 'desc'; desc.textContent = p.blurb;
+      t.append(name, desc);
+      card.append(tile, t);
+      if (have) {
+        const st = document.createElement('span'); st.className = 'state'; st.textContent = 'Added';
+        card.append(st);
+        card.setAttribute('aria-label', p.title + ', added. Open its settings');
       }
+      card.addEventListener('click', () => (have ? select(have.id) : create(p.hosts[0])));
+      box.append(card);
     }
   }
 
@@ -285,7 +446,7 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
     const existing = boosts.find((b) => b.host === host);
     if (existing) { select(existing.id); return; }
     const preset = presetFor(host);
-    const b = { id: Date.now(), name: preset ? PRESETS[preset].title : host, host, enabled: true, preset, options: preset ? ['hide_shorts', 'clean_player', 'mono'] : [], css: '', js: '', run_css: '', run_js: '' };
+    const b = { id: Date.now(), name: preset ? PRESETS[preset].title : host, host, enabled: true, preset, options: preset ? [...PRESETS[preset].defaults] : [], css: '', js: '', run_css: '', run_js: '' };
     boosts.push(b);
     select(b.id);
     save(b, true);
@@ -294,7 +455,6 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
 
   // ---------- editor events ----------
   $('#add').addEventListener('click', () => { current = null; renderList(); renderEditor(); $('#new-host').focus(); });
-  $('#start-yt').addEventListener('click', () => create('youtube.com'));
   $('#new-form').addEventListener('submit', (e) => { e.preventDefault(); create($('#new-host').value); $('#new-host').value = ''; });
   $('#name').addEventListener('input', () => { const b = cur(); b.name = $('#name').value; save(b); });
   $('#enabled').addEventListener('change', () => { const b = cur(); b.enabled = $('#enabled').checked; save(b, true); renderEditor(); });
@@ -305,8 +465,10 @@ button.row:focus-visible, .code:focus-visible { outline-offset: -2px; }
     if (!host) { $('#host').value = b.host; return; }
     b.host = host; save(b, true); renderEditor();
   });
-  $('#p-min').addEventListener('click', () => { const b = cur(); b.options = [...PRESETS[b.preset].minimal]; save(b, true); renderEditor(); });
-  $('#p-none').addEventListener('click', () => { const b = cur(); b.options = []; save(b, true); renderEditor(); });
+  // Recommended / All off change the site's switches only; Tools you picked stay.
+  const keepTools = (b) => b.options.filter((id) => TOOLS.some((o) => o.id === id));
+  $('#p-min').addEventListener('click', () => { const b = cur(); b.options = [...new Set([...PRESETS[b.preset].recommended, ...keepTools(b)])]; save(b, true); renderEditor(); });
+  $('#p-none').addEventListener('click', () => { const b = cur(); b.options = keepTools(b); save(b, true); renderEditor(); });
   $('#open').addEventListener('click', () => send({ t: 'boostOpen', id: current }));
   $('#reload').addEventListener('click', () => { if (timer) { clearTimeout(timer); send({ t: 'boostSave', boost: build(cur()) }); } send({ t: 'boostReload', id: current }); });
   const del = $('#delete');
