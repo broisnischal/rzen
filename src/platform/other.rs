@@ -54,6 +54,7 @@ pub fn copy_text(_text: &str) {}
 pub fn share(_window: &Window, _url: &str, _rect: (f64, f64, f64, f64)) {}
 pub fn install_key_fixes() {}
 pub fn plain_text_input(_view: &WebView) {}
+pub fn preconnect(_view: &WebView, _url: &str) {}
 pub fn release(_view: &WebView) {}
 pub fn clear_proxy(_store: Option<[u8; 16]>) {}
 pub fn clear_cache(_store: Option<[u8; 16]>, done: impl Fn() + 'static) {

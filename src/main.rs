@@ -79,7 +79,11 @@ fn install_crash_log() {
     }));
 }
 
+/// When the process started, for RZEN_DEBUG timings.
+pub static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
 fn main() {
+    STARTED.get_or_init(std::time::Instant::now);
     install_crash_log();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let requested = args.windows(2).find(|w| w[0] == "--profile").map(|w| w[1].clone());

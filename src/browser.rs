@@ -120,6 +120,8 @@ pub enum UserEvent {
     Settings(String),
     Title(Id, String),
     Load(Id, bool, String),
+    /// RZEN_DEBUG: a main-frame navigation was requested (load timing starts here).
+    NavStart(Id),
     Favicon(Id, String),
     /// A site icon finished downloading into the local cache.
     IconCached,
@@ -234,6 +236,9 @@ pub fn build_tab_view(
         .with_navigation_handler({
             let p = p.clone();
             move |url| {
+                if debug() {
+                    let _ = p.send_event(UserEvent::NavStart(id));
+                }
                 if url.starts_with("rzen-mini:") {
                     let _ = p.send_event(UserEvent::MiniFocus(id));
                     return false;
@@ -271,6 +276,7 @@ pub fn build_tab_view(
     if sh.block_ads.get() {
         b = b.with_initialization_script_for_main_only(shields::YOUTUBE_JS, false);
     }
+    b = b.with_initialization_script_for_main_only(features::CTRL_A_JS, false);
     b = customize(platform::tab_builder_ext(b, p, id, store, sh.private));
     if let Some(url) = url {
         b = b.with_url(url);
@@ -290,6 +296,7 @@ fn build_internal_view(sh: &Rc<Shared>, html: &str) -> wry::Result<WebView> {
         .with_bounds(sh.content.get())
         .with_visible(false)
         .with_accept_first_mouse(true)
+        .with_initialization_script_for_main_only(features::CTRL_A_JS, false)
         .with_ipc_handler(move |req| {
             let _ = p.send_event(UserEvent::Settings(req.into_body()));
         })
@@ -437,6 +444,8 @@ enum Msg {
     MediaSeek { frac: f64 },
     MediaPip,
     MediaMusicOnly,
+    /// The command bar's top result changed: connect to its server ahead of Enter.
+    Preconnect { value: String, #[serde(default)] search: bool },
     /// A command chosen in the command palette (⌃⇧P).
     Command { id: String },
     /// Where the sidebar's video slot is (None = no slot): the docked mini player goes there.
@@ -540,6 +549,8 @@ pub struct Browser {
     /// Sidebar video slot reported by the chrome, and the tab docked in it.
     mini_rect: Option<(f64, f64, f64, f64)>,
     mini_tab: Option<Id>,
+    /// RZEN_DEBUG: when each tab's current navigation started.
+    nav_t0: HashMap<Id, Instant>,
     /// The playing video is in picture in picture.
     media_pip: bool,
     /// Settings section to scroll to once the settings page is ready.
@@ -724,6 +735,7 @@ impl Browser {
             share_anchor: (0.0, 0.0, 1.0, 1.0),
             mini_rect: None,
             mini_tab: None,
+            nav_t0: HashMap::new(),
             media_pip: false,
             settings_focus: None,
             boost_intent: None,
@@ -937,6 +949,7 @@ impl Browser {
         if self.tabs[i].view.is_some() {
             return;
         }
+        let t0 = Instant::now();
         let d = &self.tabs[i].d;
         let built = if let Some(page) = internal(&d.url) {
             build_internal_view(&self.sh, page.2)
@@ -952,6 +965,10 @@ impl Browser {
                 let t = &mut self.tabs[i];
                 t.loading = !t.is_internal();
                 t.view = Some(view);
+                if debug() {
+                    log!("perf view {} built in {:.1}ms", t.d.id, t0.elapsed().as_secs_f64() * 1000.0);
+                    self.nav_t0.insert(self.tabs[i].d.id, t0);
+                }
             }
             Err(e) => log!("rzen: could not create web view: {e}"),
         }
@@ -1774,9 +1791,16 @@ impl Browser {
                 }
                 self.dirty();
             }
+            UserEvent::NavStart(id) => {
+                self.nav_t0.entry(id).or_insert_with(Instant::now);
+            }
             UserEvent::Load(id, finished, url) => {
                 if debug() {
-                    log!("load {id} finished={finished} {url}");
+                    let ms = self.nav_t0.get(&id).map_or(-1.0, |t| t.elapsed().as_secs_f64() * 1000.0);
+                    log!("perf {} {id} {ms:.0}ms {url}", if finished { "finish" } else { "commit" });
+                    if finished {
+                        self.nav_t0.remove(&id);
+                    }
                 }
                 let Some(i) = self.idx(id) else { return };
                 let t = &mut self.tabs[i];
@@ -1930,6 +1954,9 @@ impl Browser {
         match m {
             Msg::Ready => {
                 self.chrome_ready = true;
+                if debug() {
+                    log!("perf ready t+{}ms", crate::STARTED.get().map_or(0, |s| s.elapsed().as_millis()));
+                }
                 self.palette_history = None;
                 self.ui_dirty = true;
                 if std::mem::take(&mut self.palette_on_ready) {
@@ -2120,6 +2147,15 @@ impl Browser {
             }
             Msg::MediaSeek { frac } => self.media_js(&format!("{MEDIA_SEEK_JS}({})", frac.clamp(0.0, 1.0))),
             Msg::MediaPip => self.media_js(MEDIA_PIP_JS),
+            Msg::Preconnect { value, search } => {
+                let engine = self.settings.search_template();
+                let url = if search { util::search_url(&value, engine) } else { util::resolve_input(&value, engine) };
+                // Any live page shares the profile's network session; the visible one is likeliest live.
+                let view = self.attached_view().or_else(|| self.tabs.iter().filter(|t| !t.is_internal()).find_map(|t| t.view.as_ref()));
+                if let Some(v) = view.filter(|_| url.starts_with("http")) {
+                    platform::preconnect(v, &url);
+                }
+            }
             Msg::MediaMusicOnly => {
                 self.settings.music_only = !self.settings.music_only;
                 self.save_settings();

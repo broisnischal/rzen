@@ -582,6 +582,17 @@ pub fn attached(view: &WebView, window: &Window) -> bool {
     view.webview().window().is_some_and(|w| Retained::as_ptr(&w) == ours)
 }
 
+/// Opens the connection (DNS, TCP, TLS) to `url`'s server before it's needed.
+pub fn preconnect(view: &WebView, url: &str) {
+    let wk = view.webview();
+    if !wk.respondsToSelector(sel!(_preconnectToServer:)) {
+        return;
+    }
+    if let Some(u) = NSURL::URLWithString(&NSString::from_str(url)) {
+        let _: () = unsafe { msg_send![&*wk, _preconnectToServer: &*u] };
+    }
+}
+
 /// Web forms get exactly what was typed: no smart quotes/dashes or text replacement
 /// (they corrupt code, passwords and rich editors). Matches Chrome's behaviour.
 pub fn plain_text_input(view: &WebView) {

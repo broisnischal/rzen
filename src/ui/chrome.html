@@ -1760,6 +1760,7 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
   }
 
   function openPalette(o) {
+    preSeen = new Set();
     if (o.history) {
       H = o.history.map(([url, title, score, icon]) => ({ url, title, score, icon, host: shortHost(url).toLowerCase(), key: (url + ' ' + title).toLowerCase() }));
     }
@@ -1814,6 +1815,21 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     });
     pin.setAttribute('aria-activedescendant', items.length ? 'res-' + sel : '');
     document.getElementById('res-' + sel)?.scrollIntoView({ block: 'nearest' });
+    preconnectSel();
+  }
+
+  // While you type, rzen connects to the selected result's server (or the search engine), so
+  // Enter skips DNS, TCP and TLS. Once per server per command bar.
+  let preSeen = new Set(), preTimer = 0;
+  function preconnectSel() {
+    clearTimeout(preTimer);
+    const it = items[sel];
+    if (!it || it.kind === 'tab' || it.kind === 'cmd') return;
+    const search = it.kind === 'search', value = search ? it.title : it.url;
+    if (!value || isInternal(value)) return;
+    const key = search ? 'search' : value.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/)[0];
+    if (preSeen.has(key)) return;
+    preTimer = setTimeout(() => { preSeen.add(key); send({ t: 'preconnect', value, search }); }, 60);
   }
 
   function submit() {

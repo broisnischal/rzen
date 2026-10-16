@@ -33,8 +33,9 @@ fn uuid() -> String {
 
 /// Ctrl+A selects everything in a text field, as on Windows and Linux (macOS keeps it for
 /// "start of line"; ⌘A works as always). It runs after the page's own handlers, so a page that
-/// uses Ctrl+A itself, like a web terminal, keeps it.
-const CTRL_A_JS: &str = "addEventListener('keydown',(e)=>{if(!e.ctrlKey||e.metaKey||e.altKey||e.shiftKey||e.defaultPrevented||e.key.toLowerCase()!=='a')return;const t=e.composedPath()[0];if(!(t instanceof Element)||!(t.isContentEditable||t.matches('input,textarea')))return;e.preventDefault();if(!t.isContentEditable&&t.select)t.select();else document.execCommand('selectAll')});";
+/// uses Ctrl+A itself, like a web terminal, keeps it. Installed in every frame of every web view
+/// (tabs, rzen's own pages, the AI panel): plenty of text fields live in iframes.
+pub(super) const CTRL_A_JS: &str = "addEventListener('keydown',(e)=>{if(!e.ctrlKey||e.metaKey||e.altKey||e.shiftKey||e.defaultPrevented||e.key.toLowerCase()!=='a')return;const t=e.composedPath()[0];if(!(t instanceof Element)||!(t.isContentEditable||t.matches('input,textarea')))return;e.preventDefault();if(!t.isContentEditable&&t.select)t.select();else document.execCommand('selectAll')});";
 
 /// Keeps what you're reading in place when the page's width changes (sidebar, AI panel, window
 /// resize). WebKit doesn't anchor scrolling the way Chrome does, so text rewrapping above the
@@ -354,10 +355,9 @@ impl Browser {
 
     // ---------- notifications ----------
 
-    /// Boosts, Ctrl+A for text fields, scroll anchoring, and the notification shim with this profile's per-site decisions.
+    /// Boosts, scroll anchoring, and the notification shim with this profile's per-site decisions.
     pub(super) fn page_scripts(&self) -> Vec<String> {
         let mut scripts = crate::boosts::scripts(&self.boosts);
-        scripts.push(CTRL_A_JS.into());
         scripts.push(SCROLL_ANCHOR_JS.into());
         if platform::notifications_supported() {
             scripts.push(platform::NOTIFY_JS.replace("__PERMS__", &json!(self.notify_perms).to_string()));
