@@ -1,6 +1,6 @@
 [package]
 name = "rzen"
-version = "0.1.2"
+version = "0.1.3"
 description = "A fast, memory-lean, Zen-style browser built on the native system engine"
 edition = "2024"
 license = "MIT"
