@@ -25,9 +25,12 @@ use crate::{browser::UserEvent, model::Id};
 // ---------- ⌘-shortcuts ----------
 
 static WEBKIT_KEY_EQUIVALENT: OnceLock<usize> = OnceLock::new();
+static WEBKIT_BECOME_FIRST_RESPONDER: OnceLock<usize> = OnceLock::new();
 
 thread_local! {
     static CHROME: Cell<usize> = const { Cell::new(0) };
+    /// One of the browser UI's text fields has the keyboard (command bar, find, rename, AI).
+    static UI_TYPING: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Extends wry's web view classes (key routing, JavaScript dialogs). objc2 names classes
@@ -37,6 +40,7 @@ pub fn extend_wry(chrome: &WebView) {
     let wk = chrome.webview();
     CHROME.with(|c| c.set(Retained::as_ptr(&wk) as usize));
     route_key_equivalents(wk.class());
+    guard_keyboard(wk.class());
     if let Some(delegate) = unsafe { wk.UIDelegate() } {
         let delegate: &AnyObject = delegate.as_ref();
         install_js_dialogs(delegate.class());
@@ -93,6 +97,47 @@ fn menu_handles(e: &NSEvent) -> bool {
     let Some(menu) = NSApplication::sharedApplication(mtm).mainMenu() else { return false };
     let key = e.charactersIgnoringModifiers().map(|s| s.to_string().to_lowercase()).unwrap_or_default();
     walk(&menu, &key, e.modifierFlags() & KEY_MODS)
+}
+
+// ---------- keyboard ownership ----------
+
+/// The UI tells rzen when one of its text fields gains or loses focus.
+pub fn set_ui_typing(on: bool) {
+    UI_TYPING.with(|c| c.set(on));
+}
+
+/// A page's script can focus one of its own fields (a search box that focuses itself as the
+/// page loads) and WebKit then takes the window's keyboard, out from under the command bar or
+/// find field you're typing in. While a UI field has focus, only a real click moves the
+/// keyboard to a page; rzen hands it over itself when it means to (`set_ui_typing(false)` first).
+fn guard_keyboard(wry: &AnyClass) {
+    let Some(wk) = AnyClass::get(c"WKWebView") else { return };
+    let Some(webkit) = wk.instance_method(sel!(becomeFirstResponder)) else { return };
+    if WEBKIT_BECOME_FIRST_RESPONDER.set(webkit.implementation() as usize).is_err() {
+        return;
+    }
+    let imp: unsafe extern "C-unwind" fn(&NSView, Sel) -> Bool = become_first_responder;
+    let cls = wry as *const AnyClass as *mut AnyClass;
+    unsafe { objc2::ffi::class_addMethod(cls, sel!(becomeFirstResponder), std::mem::transmute::<_, Imp>(imp), c"B@:".as_ptr()) };
+}
+
+unsafe extern "C-unwind" fn become_first_responder(this: &NSView, cmd: Sel) -> Bool {
+    let me = this as *const NSView as usize;
+    if UI_TYPING.with(Cell::get) && CHROME.with(Cell::get) != me && !clicked() {
+        return Bool::NO;
+    }
+    let Some(&imp) = WEBKIT_BECOME_FIRST_RESPONDER.get() else { return Bool::YES };
+    let webkit: unsafe extern "C-unwind" fn(&NSView, Sel) -> Bool = unsafe { std::mem::transmute(imp) };
+    unsafe { webkit(this, cmd) }
+}
+
+/// Whether the event being handled is a mouse press (the user clicked into a view).
+fn clicked() -> bool {
+    use objc2_app_kit::NSEventType;
+    let Some(mtm) = MainThreadMarker::new() else { return false };
+    NSApplication::sharedApplication(mtm)
+        .currentEvent()
+        .is_some_and(|e| matches!(e.r#type(), NSEventType::LeftMouseDown | NSEventType::RightMouseDown | NSEventType::OtherMouseDown))
 }
 
 // ---------- alert / confirm / prompt ----------

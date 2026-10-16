@@ -394,6 +394,8 @@ enum Msg {
     TitlebarDblClick,
     Find { q: String, back: bool, again: bool },
     FindClose,
+    /// One of the UI's text fields gained (`on`) or lost focus.
+    UiTyping { on: bool },
     OpenDownloads,
     ToastClose,
     Ai,
@@ -860,6 +862,7 @@ impl Browser {
     }
 
     fn focus_content(&self) {
+        platform::set_ui_typing(false);
         match self.attached_view() {
             Some(v) => {
                 let _ = v.focus();
@@ -962,6 +965,7 @@ impl Browser {
             let _ = v.set_visible(true);
             platform::foreground(v);
             if !self.overlay {
+                platform::set_ui_typing(false);
                 let _ = v.focus();
             }
         }
@@ -1396,7 +1400,11 @@ impl Browser {
             "__rzen.palette({})",
             json!({ "mode": mode, "value": value, "tabs": tabs, "history": history })
         ));
+        // The command bar takes the keyboard right away, before a loading page can claim it, even
+        // when the overlay was already up (a sidebar peek).
+        platform::set_ui_typing(true);
         self.set_overlay(true);
+        let _ = self.chrome.focus();
     }
 
     fn close_palette(&mut self) {
@@ -1410,6 +1418,7 @@ impl Browser {
         self.finding = true;
         self.force_sidebar();
         self.ui_dirty = true;
+        platform::set_ui_typing(true);
         let _ = self.chrome.focus();
         self.js("__rzen.find()");
     }
@@ -1969,6 +1978,12 @@ impl Browser {
                 w.set_maximized(!w.is_maximized());
             }
             Msg::Find { q, back, again } => self.find(&q, back, again),
+            Msg::UiTyping { on } => {
+                platform::set_ui_typing(on);
+                if on {
+                    let _ = self.chrome.focus();
+                }
+            }
             Msg::FindClose => {
                 self.finding = false;
                 self.release_sidebar();

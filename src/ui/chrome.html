@@ -879,6 +879,20 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     send({ t: 'peek', on: false });
   });
 
+  // Keyboard focus follows our text fields. A field focused from script (command bar, find,
+  // rename, the AI input) doesn't make this view the window's keyboard target by itself, so rzen
+  // is told, takes the keyboard and keeps pages from grabbing it back until the field is left.
+  const typing = (el) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || !!(el && el.isContentEditable);
+  document.addEventListener('focusin', (e) => { if (typing(e.target)) send({ t: 'uiTyping', on: true }); });
+  document.addEventListener('focusout', (e) => { if (typing(e.target) && !typing(e.relatedTarget)) send({ t: 'uiTyping', on: false }); });
+
+  // Ctrl+A selects all in our text fields too, as on Windows and Linux (⌘A always does).
+  addEventListener('keydown', (e) => {
+    if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.defaultPrevented || e.key.toLowerCase() !== 'a') return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) { e.preventDefault(); t.select(); }
+  });
+
   // ---------- swipe between spaces ----------
   // A two-finger horizontal swipe over the sidebar moves one space left or right. Momentum
   // keeps extending the same gesture, so a single swipe never skips a space.
