@@ -55,6 +55,17 @@ pub fn share(_window: &Window, _url: &str, _rect: (f64, f64, f64, f64)) {}
 pub fn install_key_fixes() {}
 pub fn plain_text_input(_view: &WebView) {}
 pub fn preconnect(_view: &WebView, _url: &str) {}
+pub fn set_status(_window: &Window, _status: Option<(&str, Option<f64>)>, _page: (f64, f64, f64, f64)) {}
+pub fn watch_links(_chrome: &WebView, _proxy: tao::event_loop::EventLoopProxy<crate::browser::UserEvent>) {}
+pub fn view_key(_view: &WebView) -> usize {
+    0
+}
+pub fn load_progress(_view: &WebView) -> f64 {
+    0.0
+}
+pub fn pointer_over(_view: &WebView) -> bool {
+    false
+}
 pub fn release(_view: &WebView) {}
 pub fn clear_proxy(_store: Option<[u8; 16]>) {}
 pub fn clear_cache(_store: Option<[u8; 16]>, done: impl Fn() + 'static) {

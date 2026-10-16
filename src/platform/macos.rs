@@ -32,7 +32,9 @@ use wry::{
     WebViewExtMacOS,
 };
 
+mod status;
 mod web;
+pub use status::*;
 pub use web::*;
 
 use crate::{

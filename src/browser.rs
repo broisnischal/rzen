@@ -122,6 +122,8 @@ pub enum UserEvent {
     Settings(String),
     Title(Id, String),
     Load(Id, bool, String),
+    /// The link under the pointer in a page changed (page key, URL or empty).
+    LinkHover(usize, String),
     /// RZEN_DEBUG: a main-frame navigation was requested (load timing starts here).
     NavStart(Id),
     Favicon(Id, String),
@@ -558,6 +560,10 @@ pub struct Browser {
     spare: Option<(Id, Option<[u8; 16]>, WebView)>,
     /// When to build the next spare (after startup settles, after one is used or dropped).
     spare_at: Option<Instant>,
+    /// The link under the pointer in the visible page, for the status bubble.
+    hover_url: String,
+    /// What the status bubble last showed (text, progress, page frame), to skip repeat work.
+    status_key: Option<String>,
     /// The playing video is in picture in picture.
     media_pip: bool,
     /// Settings section to scroll to once the settings page is ready.
@@ -681,6 +687,7 @@ impl Browser {
             .build_as_child(&sh.window)?;
         platform::plain_text_input(&chrome);
         platform::extend_wry(&chrome);
+        platform::watch_links(&chrome, proxy.clone());
         platform::init_notifications(&proxy);
         // Icons stored before this run: make sure every tab's is on disk.
         for href in session.tabs.iter().filter_map(|t| t.favicon.clone()) {
@@ -745,6 +752,8 @@ impl Browser {
             nav_t0: HashMap::new(),
             spare: None,
             spare_at: Some(Instant::now() + SPARE_DELAY * 2),
+            hover_url: String::new(),
+            status_key: None,
             media_pip: false,
             settings_focus: None,
             boost_intent: None,
@@ -845,9 +854,39 @@ impl Browser {
     }
 
     fn content_rect(&self) -> Rect {
+        let (x, y, w, h) = self.content_xywh();
+        rect(x, y, w, h)
+    }
+
+    /// The page's frame in window points: x, y, width, height.
+    fn content_xywh(&self) -> (f64, f64, f64, f64) {
         let (w, h) = self.win_size();
         let x = if self.sidebar_open { self.sidebar_w } else { GAP };
-        rect(x, GAP, w - x - GAP - self.ai_extra(), h - 2.0 * GAP)
+        (x, GAP, w - x - GAP - self.ai_extra(), h - 2.0 * GAP)
+    }
+
+    /// The status bubble at the page's bottom-left: the link under the pointer, else (with the
+    /// sidebar collapsed, so its loading bar is out of sight) what's loading and how far along.
+    fn sync_status(&mut self) {
+        let shown = self.visible.and_then(|id| self.tab(id)).filter(|t| !t.is_internal() && !self.overlay && !self.peek && self.gate.is_none());
+        let status = shown.and_then(|t| {
+            let v = t.view.as_ref().filter(|v| platform::attached(v, &self.sh.window))?;
+            if !self.hover_url.is_empty() && platform::pointer_over(v) {
+                let u = &self.hover_url;
+                Some((u.strip_prefix("https://").unwrap_or(u).trim_end_matches('/').to_string(), None))
+            } else if t.loading && !self.sidebar_open {
+                Some((format!("Loading {}…", util::short_host(&t.d.url)), Some(platform::load_progress(v))))
+            } else {
+                None
+            }
+        });
+        let page = self.content_xywh();
+        let key = status.as_ref().map(|(s, p)| format!("{s}|{}|{page:?}", p.map_or(-1, |p| (p * 20.0) as i32)));
+        if key == self.status_key {
+            return;
+        }
+        self.status_key = key;
+        platform::set_status(&self.sh.window, status.as_ref().map(|(s, p)| (s.as_str(), *p)), page);
     }
 
     fn ai_rect(&self) -> Rect {
@@ -1023,6 +1062,7 @@ impl Browser {
         let title = if t.d.title.is_empty() { util::short_host(&t.d.url).to_string() } else { t.d.title.clone() };
         self.sh.window.set_title(&if self.sh.private { format!("Private — {title}") } else { title });
         self.visible = Some(id);
+        self.hover_url.clear();
         if was_live {
             self.sync_load_state(id);
         }
@@ -1869,6 +1909,12 @@ impl Browser {
                 self.dirty();
             }
             UserEvent::MiniFocus(id) => self.show(id),
+            UserEvent::LinkHover(key, url) => {
+                if self.active_view().is_some_and(|v| platform::view_key(v) == key) {
+                    self.hover_url = url;
+                    self.sync_status();
+                }
+            }
             UserEvent::Speed(result) => {
                 let v = match result {
                     Ok(v) => v,
@@ -2718,6 +2764,7 @@ impl Browser {
         if now >= self.nav_next {
             self.nav_next = now + NAV_POLL;
             self.sync_nav();
+            self.sync_status();
         }
         if self.spare_at.is_some_and(|t| now >= t) {
             self.build_spare();
