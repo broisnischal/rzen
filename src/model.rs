@@ -133,6 +133,19 @@ impl Default for TabData {
     }
 }
 
+impl TabData {
+    /// The sidebar section it sits in, as the UI names it.
+    pub fn section(&self) -> &'static str {
+        if self.essential {
+            "essential"
+        } else if self.pinned {
+            "pinned"
+        } else {
+            "tabs"
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Workspace {

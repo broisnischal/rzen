@@ -119,6 +119,8 @@ pub fn build() -> Menu {
     tabs.append_items(&[
         &item("next_tab", "Next Tab", Some("Ctrl+Tab")),
         &item("prev_tab", "Previous Tab", Some("Ctrl+Shift+Tab")),
+        &item("move_tab_up", "Move Tab Up", Some("CmdOrCtrl+Alt+Up")),
+        &item("move_tab_down", "Move Tab Down", Some("CmdOrCtrl+Alt+Down")),
         &sep(),
         &item("next_ws", "Next Workspace", Some("Ctrl+Alt+Right")),
         &item("prev_ws", "Previous Workspace", Some("Ctrl+Alt+Left")),

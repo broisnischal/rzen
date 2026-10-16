@@ -1257,6 +1257,20 @@ impl Browser {
         self.show(order[next]);
     }
 
+    /// Moves the active tab one place up (-1) or down (1) within its section.
+    fn nudge_tab(&mut self, step: isize) {
+        let Some(t) = self.active_id().and_then(|a| self.tab(a)) else { return };
+        let (id, section) = (t.d.id, t.d.section());
+        let order: Vec<Id> = self.display_order().into_iter().filter(|&o| self.tab(o).is_some_and(|o| o.d.section() == section)).collect();
+        let Some(i) = order.iter().position(|&o| o == id) else { return };
+        let before = match step {
+            -1 if i > 0 => Some(order[i - 1]),
+            1 if i + 1 < order.len() => order.get(i + 2).copied(),
+            _ => return,
+        };
+        self.move_tab(id, before, section);
+    }
+
     fn zoom(&mut self, dir: i8) {
         let Some(i) = self.active_id().and_then(|id| self.idx(id)) else { return };
         let t = &mut self.tabs[i];
@@ -2300,6 +2314,8 @@ impl Browser {
             }
             "next_tab" => self.cycle_tab(1),
             "prev_tab" => self.cycle_tab(-1),
+            "move_tab_up" => self.nudge_tab(-1),
+            "move_tab_down" => self.nudge_tab(1),
             "next_ws" => self.cycle_ws(1),
             "prev_ws" => self.cycle_ws(-1),
             "pin_tab" => {

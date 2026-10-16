@@ -137,7 +137,7 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 /* switching spaces: the tab list slides in from the side you swiped toward */
 @keyframes ws-in { from { translate: var(--ws-from) 0; opacity: 0; } }
 @media (prefers-reduced-motion: no-preference) { #scroll.ws-in { animation: ws-in 200ms var(--ease); } }
-.list { display: flex; flex-direction: column; gap: 2px; min-height: 2px; }
+.list { display: flex; flex-direction: column; gap: 2px; min-height: 2px; position: relative; }
 .divider { height: 1px; background: var(--line); margin: 8px 10px; flex: none; }
 #pinned:empty + .divider { display: none; }
 
@@ -156,6 +156,10 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 .drop-before::before { content: ''; position: absolute; inset-inline: 6px; top: -2px; height: 2px; border-radius: 1px; background: var(--fg); }
 .ess.drop-before::before { inset-inline: -4px auto; top: 8px; bottom: 8px; width: 2px; height: auto; }
 .list.drop-end { box-shadow: inset 0 -2px 0 var(--fg); }
+.tab.dragging, .ess.dragging { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) { .tab-drag .list > .tab { transition: transform 180ms var(--ease), background-color 150ms var(--ease); } }
+.tab.drag-ghost, .ess.drag-ghost { position: fixed; z-index: 50; pointer-events: none; margin: 0; transition: none; background: var(--raised); box-shadow: 0 0 0 1px var(--line), 0 8px 24px oklch(0 0 0 / 0.16); }
+.tab-drag, .tab-drag * { cursor: grabbing !important; }
 
 .fav { width: 16px; height: 16px; flex: none; border-radius: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 600; position: relative; }
 .fav.letter { background: var(--field); color: var(--fg2); box-shadow: inset 0 0 0 1px var(--line); }
@@ -594,7 +598,6 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     const el = document.createElement('div');
     el.className = 'tab';
     el.setAttribute('role', 'tab');
-    el.draggable = true;
     el.innerHTML = '<div class="fav" aria-hidden="true"></div><div class="title"></div>';
     const sound = document.createElement('button');
     sound.className = 'sound';
@@ -616,7 +619,6 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     const el = document.createElement('div');
     el.className = 'ess';
     el.setAttribute('role', 'tab');
-    el.draggable = true;
     el.innerHTML = '<div class="fav" aria-hidden="true"></div>';
     wireTab(el, t.id);
     return el;
@@ -625,7 +627,9 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     el.addEventListener('mousedown', (e) => { if (e.button === 0 && !e.target.closest('.close')) send({ t: 'select', id }); });
     el.addEventListener('auxclick', (e) => { if (e.button === 1) send({ t: 'close', id }); });
     el.addEventListener('contextmenu', (e) => { e.preventDefault(); send({ t: 'tabCtx', id, x: e.clientX, y: e.clientY }); });
-    el.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/rzen-tab', String(id)); e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button === 0 && !e.ctrlKey && !e.target.closest('button')) drag = { el, id, pid: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, to: null };
+    });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); send({ t: 'select', id }); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); send({ t: 'close', id }); }
@@ -711,9 +715,6 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
       b.innerHTML = '<span aria-hidden="true"></span>';
       b.addEventListener('click', () => send({ t: 'ws', id: w.id }));
       b.addEventListener('contextmenu', (e) => { e.preventDefault(); send({ t: 'wsCtx', id: w.id, x: e.clientX, y: e.clientY }); });
-      b.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('text/rzen-tab')) { e.preventDefault(); b.classList.add('drop'); } });
-      b.addEventListener('dragleave', () => b.classList.remove('drop'));
-      b.addEventListener('drop', (e) => { e.preventDefault(); b.classList.remove('drop'); send({ t: 'moveWs', id: +e.dataTransfer.getData('text/rzen-tab'), ws: w.id }); });
       return b;
     }, (b, w) => {
       const active = w.id === s.activeWs;
@@ -805,26 +806,119 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     if (pendingRename === s.activeWs) { pendingRename = null; startRename(); }
   }
 
-  // ---------- drag & drop reordering ----------
-  let dropMark = null;
-  const clearMark = () => { document.querySelectorAll('.drop-before,.drop-end').forEach((e) => e.classList.remove('drop-before', 'drop-end')); dropMark = null; };
-  for (const list of document.querySelectorAll('[data-section]')) {
-    list.addEventListener('dragover', (e) => {
-      if (!e.dataTransfer.types.includes('text/rzen-tab')) return;
-      e.preventDefault();
-      clearMark();
-      const target = e.target.closest('.tab,.ess');
-      if (target && list.contains(target)) { target.classList.add('drop-before'); dropMark = { section: list.dataset.section, before: +target.dataset.id }; }
-      else { list.classList.add('drop-end'); dropMark = { section: list.dataset.section, before: null }; }
-    });
-    list.addEventListener('drop', (e) => {
-      e.preventDefault();
-      const id = +e.dataTransfer.getData('text/rzen-tab');
-      if (dropMark && id && dropMark.before !== id) send({ t: 'move', id, before: dropMark.before, section: dropMark.section });
-      clearMark();
+  // ---------- drag to reorder ----------
+  // Tabs follow the pointer instead of using the system drag session, which WebKit can drop
+  // mid-drag. In its own list the other tabs slide apart where it will land; over another list
+  // a line marks the spot, and letting go over a space's dot moves it to that space. Letting go
+  // anywhere else leaves it where it was.
+  let drag = null;
+  const clearMarks = () => document.querySelectorAll('.drop-before,.drop-end,.wsb.drop').forEach((e) => e.classList.remove('drop-before', 'drop-end', 'drop'));
+  // Where the held tab would land at (x, y), or null for nowhere new.
+  function dropAt(x, y) {
+    const hit = document.elementFromPoint(x, y);
+    if (!hit) return null;
+    const ws = hit.closest('.wsb');
+    if (ws) return +ws.dataset.id === S.activeWs ? null : { ws: +ws.dataset.id, mark: ws, cls: 'drop' };
+    let list = hit.closest('[data-section]');
+    if (!list) {
+      if (!hit.closest('#scroll')) return null;
+      // Between the lists (the divider, New Tab, the space below): above the tabs pins it.
+      list = y < $('#tabs').getBoundingClientRect().top ? $('#pinned') : $('#tabs');
+    }
+    const grid = list.id === 'essentials';
+    const top = list.getBoundingClientRect().top;
+    const next = [...list.children].find((c) => {
+      if (c === drag.el) return false;
+      if (grid) {
+        const r = c.getBoundingClientRect();
+        return y < r.top || (y < r.bottom && x < r.left + r.width / 2);
+      }
+      // Layout position, not the slid one, so the gap doesn't chase the pointer.
+      return y < top + c.offsetTop + c.offsetHeight / 2;
+    }) || null;
+    const own = drag.el.parentNode === list;
+    if (own && next === drag.el.nextElementSibling) return null;
+    const slide = own && !grid;
+    return { list, next, slide, section: list.dataset.section, before: next && +next.dataset.id, mark: !slide && (next || list), cls: next ? 'drop-before' : 'drop-end' };
+  }
+  function dragMove() {
+    const d = drag, sb = $('#sidebar').getBoundingClientRect();
+    const left = Math.min(Math.max(d.x - d.dx, sb.left), sb.right - d.w);
+    d.g.style.transform = `translate(${Math.round(left - d.left)}px, ${Math.round(d.y - d.y0)}px)`;
+    const to = dropAt(d.x, d.y);
+    if (to?.mark !== d.to?.mark || to?.cls !== d.to?.cls) {
+      clearMarks();
+      if (to?.mark) to.mark.classList.add(to.cls);
+    }
+    d.to = to;
+    // The tabs between its old place and the new one slide over by one.
+    const all = [...d.el.parentNode.children], from = all.indexOf(d.el);
+    const items = all.filter((c) => c !== d.el);
+    const at = to?.slide ? (to.next ? items.indexOf(to.next) : items.length) : from;
+    items.forEach((c, j) => {
+      const by = j >= at && j < from ? d.h : j >= from && j < at ? -d.h : 0;
+      const v = by ? `translateY(${by}px)` : '';
+      if (c.style.transform !== v) c.style.transform = v;
     });
   }
-  document.addEventListener('dragend', clearMark);
+  // Holding a tab near the top or bottom of the list scrolls it.
+  function dragScroll() {
+    if (!drag?.on) return;
+    const sc = $('#scroll'), r = sc.getBoundingClientRect(), y = drag.y;
+    const v = y < r.top + 32 && y > r.top - 48 ? -1 : y > r.bottom - 32 && y < r.bottom + 48 ? 1 : 0;
+    if (v) {
+      const top = sc.scrollTop;
+      sc.scrollTop = top + v * 8;
+      if (sc.scrollTop !== top) dragMove();
+    }
+    drag.raf = requestAnimationFrame(dragScroll);
+  }
+  function dragEnd(commit) {
+    const d = drag;
+    drag = null;
+    if (!d?.on) return;
+    cancelAnimationFrame(d.raf);
+    d.g.remove();
+    clearMarks();
+    // Snap without sliding back: transitions go off before the tabs drop their offsets.
+    document.documentElement.classList.remove('tab-drag');
+    const to = commit && d.to;
+    // Within its list it lands right away (the update that follows agrees); a move elsewhere
+    // re-creates it there, so the old one stays hidden until then.
+    if (to?.slide) to.list.insertBefore(d.el, to.next);
+    for (const c of d.el.parentNode.children) c.style.transform = '';
+    if (!to || to.slide) d.el.classList.remove('dragging');
+    else setTimeout(() => d.el.classList.remove('dragging'), 600);
+    if (to?.ws) send({ t: 'moveWs', id: d.id, ws: to.ws });
+    else if (to) send({ t: 'move', id: d.id, before: to.before, section: to.section });
+  }
+  addEventListener('pointermove', (e) => {
+    const d = drag;
+    if (!d || e.pointerId !== d.pid) return;
+    d.x = e.clientX;
+    d.y = e.clientY;
+    if (!d.on) {
+      if (Math.abs(d.x - d.x0) + Math.abs(d.y - d.y0) < 6) return;
+      const r = d.el.getBoundingClientRect();
+      const g = d.el.cloneNode(true);
+      g.classList.add('drag-ghost');
+      g.classList.remove('drop-before');
+      g.setAttribute('aria-hidden', 'true');
+      Object.assign(g.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+      document.body.appendChild(g);
+      const gap = parseFloat(getComputedStyle(d.el.parentNode).rowGap) || 0;
+      Object.assign(d, { on: true, g, left: r.left, w: r.width, h: r.height + gap, dx: d.x0 - r.left });
+      d.el.classList.add('dragging');
+      document.documentElement.classList.add('tab-drag');
+      try { d.el.setPointerCapture(d.pid); } catch {}
+      dragScroll();
+    }
+    dragMove();
+  });
+  addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.pid) dragEnd(true); });
+  addEventListener('pointercancel', () => dragEnd(false));
+  // A press that starts anything new ends a drag whose release never arrived.
+  addEventListener('pointerdown', () => dragEnd(false), true);
 
   // ---------- window chrome ----------
   document.addEventListener('mousedown', (e) => {
