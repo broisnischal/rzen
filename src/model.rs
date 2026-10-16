@@ -44,6 +44,8 @@ pub struct Settings {
     pub proxy: String,
     /// Sidebar mini player for whatever is playing (video docks there when you switch tabs).
     pub mini_player: bool,
+    /// Videos stay out of the mini player: it shows the cover and spectrum, as for music.
+    pub music_only: bool,
     /// Unload least-recently-used background tabs while rzen's total memory is above this. 0 = no limit.
     pub memory_limit_mb: u64,
     /// Which defaults this file was written with (see `Settings::migrate`). Missing = 0.
@@ -65,6 +67,7 @@ impl Default for Settings {
             agent_enabled: false,
             proxy: String::new(),
             mini_player: true,
+            music_only: false,
             memory_limit_mb: 0,
             defaults_version: SETTINGS_DEFAULTS,
         }

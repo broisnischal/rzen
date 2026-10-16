@@ -317,33 +317,53 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
   position: relative; isolation: isolate; overflow: hidden; flex: none; display: none; flex-direction: column; gap: 8px;
   margin-top: 8px; padding: 8px; border-radius: 18px; background: var(--field);
 }
+/* LED-style pixel spectrum behind the controls while something plays (drawn by fxFrame) */
+#m-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 .has-media #player { display: flex; }
 @media (prefers-reduced-motion: no-preference) { .has-media #player { animation: rise-in 200ms var(--ease); } }
 @keyframes rise-in { from { opacity: 0; translate: 0 4px; } }
 /* the docked page view sits exactly on #m-video; its native corner radius is 10 (outer 18 = 10 + 8 padding) */
-#m-video { display: none; aspect-ratio: 16 / 9; border-radius: 10px; background: #000; }
+/* sized to the video's own shape (set from the page); tall videos stay ≤ 240px high, centred */
+#m-video { display: none; width: 100%; max-width: var(--mv-max, none); align-self: center; aspect-ratio: var(--mv-ratio, 16 / 9); border-radius: 10px; background: #000; }
 #player.has-video #m-video { display: block; }
 #player.has-video #m-art { display: none; }
-#player .top { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 2px 4px 0; }
+#player .top { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 2px 4px 0; }
 #m-art { width: 40px; height: 40px; flex: none; padding: 0; border-radius: 8px; overflow: hidden; background: var(--field); outline: 1px solid var(--line); outline-offset: -1px; transition: scale 300ms var(--ease); }
 #player:not(.playing) #m-art { scale: 0.92; }
-#m-art img { width: 100%; height: 100%; object-fit: cover; }
+#m-art canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; filter: grayscale(1) contrast(1.15); }
 #m-art svg { color: var(--fg2); }
 #player .meta { flex: 1; min-width: 0; cursor: pointer; }
 #player .mt { font-size: var(--t-md); font-weight: 600; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(90deg, #000 85%, transparent); }
+/* while gliding, both edges fade; the padding keeps the resting text where it was */
+#player .mt.scroll { padding-inline-start: 6px; margin-inline-start: -6px; mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 20px), transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  #player .meta.swap { animation: meta-in 320ms var(--ease); }
+  #player button { transition: scale 120ms var(--ease), color 150ms var(--ease), background-color 150ms var(--ease); }
+  #player button:active { scale: 0.92; }
+}
+@keyframes meta-in { from { opacity: 0; translate: 0 4px; filter: blur(2px); } }
+/* video tabs: music only and picture in picture take the EQ's place */
+.vbtn { display: none; width: 26px; height: 26px; border-radius: 6px; flex: none; color: var(--fg2); }
+#player.is-video .vbtn { display: grid; }
+#player.is-video .eq { display: none; }
+.vbtn[aria-pressed="true"] { color: var(--fg); background: var(--field); }
+@media (hover: hover) { .vbtn:hover { color: var(--fg); background: var(--hover); } }
 #player .mt span { display: inline-block; }
 @media (prefers-reduced-motion: no-preference) { #player .mt.scroll span { animation: marquee var(--dur, 8s) linear infinite alternate; } }
 @keyframes marquee { 0%, 15% { translate: 0 0; } 85%, 100% { translate: var(--dist, 0px) 0; } }
 #player .ma { font-size: var(--t-xs); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-.eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex: none; }
-.eq i { width: 2px; height: 100%; background: var(--fg); border-radius: 1px; transform-origin: bottom; scale: 1 0.3; transition: scale 300ms var(--ease); }
+.eq { display: inline-flex; align-items: flex-end; gap: 1px; height: 11px; flex: none; }
+/* four 2px pixels per column, lit in whole steps */
+.eq i { width: 2px; height: 11px; background: repeating-linear-gradient(to top, var(--fg) 0 2px, transparent 2px 3px); clip-path: inset(72.7% 0 0 0); }
 @media (prefers-reduced-motion: no-preference) {
-  .playing .eq i { animation: eq 900ms ease-in-out infinite alternate; }
-  .playing .eq i:nth-child(2) { animation-duration: 650ms; animation-delay: -300ms; }
-  .playing .eq i:nth-child(3) { animation-duration: 1100ms; animation-delay: -500ms; }
-  .playing .eq i:nth-child(4) { animation-duration: 780ms; animation-delay: -150ms; }
+  .playing .eq i { animation: eq-a 1.2s steps(1) infinite; }
+  .playing .eq i:nth-child(2) { animation-name: eq-b; animation-duration: 0.9s; }
+  .playing .eq i:nth-child(3) { animation-name: eq-c; animation-duration: 1.4s; }
+  .playing .eq i:nth-child(4) { animation-name: eq-b; animation-duration: 1.05s; animation-delay: -0.4s; }
 }
-@keyframes eq { from { scale: 1 0.25; } to { scale: 1 1; } }
+@keyframes eq-a { 0% { clip-path: inset(45.5% 0 0 0); } 20% { clip-path: inset(0 0 0 0); } 40% { clip-path: inset(18.2% 0 0 0); } 60% { clip-path: inset(72.7% 0 0 0); } 80% { clip-path: inset(18.2% 0 0 0); } }
+@keyframes eq-b { 0% { clip-path: inset(18.2% 0 0 0); } 25% { clip-path: inset(72.7% 0 0 0); } 50% { clip-path: inset(0 0 0 0); } 75% { clip-path: inset(45.5% 0 0 0); } }
+@keyframes eq-c { 0% { clip-path: inset(72.7% 0 0 0); } 17% { clip-path: inset(45.5% 0 0 0); } 33% { clip-path: inset(0 0 0 0); } 50% { clip-path: inset(18.2% 0 0 0); } 67% { clip-path: inset(45.5% 0 0 0); } 83% { clip-path: inset(0 0 0 0); } }
 #m-bar { position: relative; height: 14px; display: flex; align-items: center; cursor: pointer; margin-inline: 4px; }
 #m-bar::before { content: ''; position: absolute; inset-inline: 0; height: 3px; border-radius: 2px; background: var(--line); transition: height 150ms var(--ease); }
 #m-fill { position: relative; height: 3px; border-radius: 2px; background: var(--fg); width: 0; transition: width 1s linear, height 150ms var(--ease); }
@@ -436,11 +456,14 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
   </div>
   <div id="agent" role="status"><span class="dot" aria-hidden="true"></span>An AI agent is using rzen</div>
   <div id="player" aria-label="Now playing">
+    <canvas id="m-fx" aria-hidden="true"></canvas>
     <div id="m-video" aria-hidden="true" title="Back to the video"></div>
     <div class="top">
       <button id="m-art" aria-label="Go to playing tab"></button>
       <div class="meta" id="m-meta"><div class="mt" id="m-mt"><span id="m-title"></span></div><div class="ma" id="m-artist"></div></div>
       <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <button class="vbtn" id="m-music" aria-pressed="false" aria-label="Music only" title="Music only: keep the video out of the sidebar"><svg viewBox="0 0 16 16"><path d="M6 12V4l7-1.5v8"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="11.5" cy="10.5" r="1.5"/></svg></button>
+      <button class="vbtn" id="m-pip" aria-pressed="false" aria-label="Picture in picture" title="Picture in picture"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><rect x="8" y="8" width="4" height="3" rx="0.75" fill="currentColor"/></svg></button>
     </div>
     <div id="m-bar" role="slider" tabindex="0" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="m-fill"></div></div>
     <div class="times"><span id="m-pos">0:00</span><span id="m-dur">0:00</span></div>
@@ -752,20 +775,41 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     if (m) {
       player.classList.toggle('playing', m.playing);
       player.classList.toggle('muted', m.muted);
-      if ($('#m-title').textContent !== m.title) { $('#m-title').textContent = m.title; requestAnimationFrame(fitMarquee); }
+      if ($('#m-title').textContent !== m.title) {
+        const swap = !!$('#m-title').textContent, meta = $('#m-meta');
+        $('#m-title').textContent = m.title;
+        requestAnimationFrame(fitMarquee);
+        if (swap) { meta.classList.remove('swap'); void meta.offsetWidth; meta.classList.add('swap'); }
+      }
       $('#m-artist').textContent = m.artist;
       const art = $('#m-art');
       if (art.dataset.src !== (m.art || '')) {
         art.dataset.src = m.art || '';
-        art.innerHTML = m.art ? '<img alt="">' : ICON.music;
-        if (m.art) { const img = art.querySelector('img'); img.onerror = () => { art.innerHTML = ICON.music; }; img.src = m.art; }
+        art.innerHTML = ICON.music;
+        mosaic.img = null;
+        if (m.art) {
+          const img = new Image();
+          img.onload = () => {
+            if (art.dataset.src !== m.art) return;
+            art.innerHTML = '<canvas></canvas>';
+            Object.assign(mosaic, { img, n: 0 });
+            mosaicSync();
+          };
+          img.src = m.art;
+        }
       }
-      player.classList.toggle('has-video', !!(m.video && m.background && s.sidebarOpen));
+      player.classList.toggle('has-video', !!(m.video && m.background && s.sidebarOpen && !m.musicOnly && !m.pip));
+      player.classList.toggle('is-video', !!m.video);
+      $('#m-music').setAttribute('aria-pressed', String(!!m.musicOnly));
+      $('#m-pip').setAttribute('aria-pressed', String(!!m.pip));
+      fx.playing = m.playing;
+      mosaicSync();
       $('#m-play').setAttribute('aria-label', m.playing ? 'Pause' : 'Play');
       $('#m-mute').setAttribute('aria-label', m.muted ? 'Unmute' : 'Mute');
     }
 
     requestAnimationFrame(reportMini);
+    fxSync();
 
     // agent + profile
     body.classList.toggle('agent-on', !!s.agent);
@@ -813,6 +857,84 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     toast.classList.toggle('show', !!tm);
 
     if (pendingRename === s.activeWs) { pendingRename = null; startRename(); }
+  }
+
+  // ---------- now playing: pixel effects ----------
+  // While something plays, square pixels rise and fall behind the player like an LED spectrum,
+  // and the cover art is a mosaic that sharpens when playback starts and coarsens on pause.
+  // The spectrum is an animation that follows play/pause; pages don't expose their actual sound.
+  const fx = { playing: false, lv: [], pk: [], raf: 0, last: 0 };
+  const fxShown = () => body.classList.contains('has-media') && !document.hidden && !reduceMotion.matches
+    && (!body.classList.contains('compact') || body.classList.contains('peek'));
+  function fxSync() {
+    if (!fx.raf && fxShown() && (fx.playing || fx.lv.some((v) => v > 0.01))) fx.raf = requestAnimationFrame(fxFrame);
+  }
+  function fxFrame(now) {
+    fx.raf = 0;
+    const c = $('#m-fx'), w = c.clientWidth, h = c.clientHeight, dpr = devicePixelRatio || 1;
+    if (!fxShown() || !w || !h) return;
+    if (now - fx.last < 30) { fx.raf = requestAnimationFrame(fxFrame); return; } // ~30 fps is plenty
+    const dt = fx.last ? Math.min(now - fx.last, 100) : 33;
+    fx.last = now;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    // a band behind the controls row only, so it never runs under the text or the timeline
+    const P = 4, S = 5, cols = Math.floor((w + 1) / S), rows = Math.floor(Math.min(h * 0.6, 56) / S), ox = (w - (cols * S - 1)) / 2;
+    const t = now / 1000, beat = Math.exp(-((t * 2) % 1) * 5); // a soft 120 bpm pulse
+    for (let i = 0; i < cols; i++) {
+      const x = i / Math.max(1, cols - 1);
+      const wave = 0.55 + 0.45 * Math.sin(t * (1.9 + ((i * 7) % 5) * 0.41) + i * 1.7);
+      const target = fx.playing ? Math.min(1, Math.max(0, (0.8 - 0.45 * x) * (0.5 + 0.5 * beat * (1 - 0.6 * x)) * wave + (Math.random() - 0.5) * 0.14)) : 0;
+      const cur = fx.lv[i] || 0;
+      fx.lv[i] = cur + (target - cur) * Math.min(1, dt / (target > cur ? 50 : 240)); // quick rise, slow fall
+      fx.pk[i] = Math.max(fx.lv[i], (fx.pk[i] || 0) - dt / 1500);
+    }
+    fx.lv.length = fx.pk.length = cols;
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();
+    for (let i = 0; i < cols; i++) {
+      const n = Math.round(fx.lv[i] * rows), p = Math.round(fx.pk[i] * rows), x = ox + i * S;
+      for (let r = 0; r < n; r++) { g.globalAlpha = 0.11 * (1 - (r / rows) * 0.55); g.fillRect(x, h - (r + 1) * S, P, P); }
+      if (p > n) { g.globalAlpha = 0.18; g.fillRect(x, h - p * S, P, P); }
+    }
+    if (fx.playing || fx.lv.some((v) => v > 0.01) || fx.pk.some((v) => v > 0.01)) fx.raf = requestAnimationFrame(fxFrame);
+    else g.clearRect(0, 0, w, h);
+  }
+  document.addEventListener('visibilitychange', fxSync);
+
+  // Cover art as a pixel mosaic: n×n cells, 10 while playing, 5 when paused, stepping between.
+  const mosaic = { img: null, n: 0, timer: 0 };
+  function mosaicDraw() {
+    const cv = $('#m-art canvas'), img = mosaic.img, n = mosaic.n;
+    if (!cv || !img || !n) return;
+    const W = Math.round((cv.clientWidth || 40) * (devicePixelRatio || 1));
+    if (cv.width !== W) cv.width = cv.height = W;
+    const small = mosaicDraw.small || (mosaicDraw.small = document.createElement('canvas'));
+    small.width = small.height = n;
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const sg = small.getContext('2d');
+    sg.imageSmoothingQuality = 'high';
+    sg.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, n, n);
+    const g = cv.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, W, W);
+    g.drawImage(small, 0, 0, n, n, 0, 0, W, W);
+  }
+  function mosaicSync() {
+    if (!mosaic.img || mosaic.timer) return;
+    const STEPS = [4, 5, 8, 10];
+    const step = () => {
+      const target = $('#player').classList.contains('playing') ? 10 : 5;
+      mosaic.timer = 0;
+      if (mosaic.n === target) return;
+      if (reduceMotion.matches) mosaic.n = target;
+      else if (!mosaic.n) mosaic.n = 4; // a new cover resolves from coarse blocks
+      else mosaic.n = STEPS[STEPS.indexOf(mosaic.n) + Math.sign(target - mosaic.n)] ?? target;
+      mosaicDraw();
+      if (mosaic.n !== target) mosaic.timer = setTimeout(step, 70);
+    };
+    step();
   }
 
   // ---------- drag to reorder ----------
@@ -1322,6 +1444,8 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 
   // ---------- media ----------
   $('#m-play').addEventListener('click', () => send({ t: 'mediaToggle' }));
+  $('#m-music').addEventListener('click', () => send({ t: 'mediaMusicOnly' }));
+  $('#m-pip').addEventListener('click', () => send({ t: 'mediaPip' }));
   $('#m-prev').addEventListener('click', () => send({ t: 'mediaStep', next: false }));
   $('#m-next').addEventListener('click', () => send({ t: 'mediaStep', next: true }));
   $('#m-mute').addEventListener('click', () => send({ t: 'mediaMute', id: null }));
@@ -1347,7 +1471,7 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     const key = JSON.stringify(r);
     if (key !== lastMini) { lastMini = key; send({ t: 'miniRect', r }); }
   }
-  new ResizeObserver(() => reportMini()).observe($('#player'));
+  { const ro = new ResizeObserver(() => reportMini()); ro.observe($('#player')); ro.observe($('#m-video')); }
   $('#player').addEventListener('animationend', reportMini);
   addEventListener('resize', reportMini);
 
@@ -1737,8 +1861,17 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
     setSidebar,
     aiKey(key) { assistant.key = key || null; msgs.innerHTML = ''; assistant.ready(); },
     aiPrompt(text) { if (S && S.ai.provider === 'assistant') assistant.ask(text); },
-    mediaTime([pos, dur, playing]) {
+    mediaTime([pos, dur, playing, ratio]) {
       mediaPos = pos; mediaDur = dur;
+      if (ratio > 0) {
+        const r = Math.min(2.6, Math.max(0.5, ratio)), slot = $('#m-video');
+        if (slot.style.getPropertyValue('--mv-ratio') !== String(r.toFixed(3))) {
+          slot.style.setProperty('--mv-ratio', r.toFixed(3));
+          slot.style.setProperty('--mv-max', Math.round(240 * r) + 'px');
+        }
+      }
+      fx.playing = playing;
+      fxSync();
       $('#m-fill').style.width = dur ? Math.min(100, (pos / dur) * 100) + '%' : '0';
       $('#m-pos').textContent = fmt(pos);
       $('#m-dur').textContent = dur ? fmt(dur) : 'Live';

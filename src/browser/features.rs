@@ -67,6 +67,9 @@ const SCROLL_ANCHOR_JS: &str = r#"(() => {
   });
 })();"#;
 
+/// CSS width a docked page lays out at (it's zoomed out to fit the mini player).
+const MINI_LAYOUT_WIDTH: f64 = 640.0;
+
 impl Browser {
     // ---------- profile ----------
 
@@ -515,6 +518,8 @@ impl Browser {
         let target = self.media_tab.filter(|&id| {
             Some(id) != self.visible
                 && self.settings.mini_player
+                && !self.settings.music_only
+                && !self.media_pip
                 && self.sidebar_open
                 && self.gate.is_none()
                 && self.mini_rect.is_some()
@@ -522,9 +527,13 @@ impl Browser {
         });
         if self.mini_tab != target {
             if let Some(old) = self.mini_tab.take() {
-                if let Some(v) = self.tab(old).and_then(|t| t.view.as_ref()) {
+                let r = self.content_rect();
+                if let Some((t, v)) = self.tab(old).and_then(|t| Some((t, t.view.as_ref()?))) {
+                    let _ = v.zoom(t.d.zoom);
                     let _ = v.evaluate_script(MINI_OFF_JS);
                     if self.visible != Some(old) {
+                        // Back at page size while hidden, so players don't stay in a tiny layout.
+                        let _ = v.set_bounds(r);
                         let _ = v.set_visible(false);
                     }
                 }
@@ -538,6 +547,9 @@ impl Browser {
             log!("mini: media={:?} visible={:?} sidebar={} rect={:?} -> docked={:?}", self.media_tab, self.visible, self.sidebar_open, self.mini_rect, self.mini_tab);
         }
         if let (Some(v), Some((x, y, w, h))) = (self.mini_tab.and_then(|id| self.tab(id)).and_then(|t| t.view.as_ref()), self.mini_rect) {
+            // Zoomed out, the page still lays out about 640px wide: players keep their normal
+            // mode and quality instead of switching to a tiny layout (and reloading) in the dock.
+            let _ = v.zoom((w / MINI_LAYOUT_WIDTH).min(1.0));
             let _ = v.set_bounds(rect(x, y, w, h));
             let _ = v.set_visible(true);
         }
@@ -776,6 +788,8 @@ impl Browser {
             "playing": t.audible,
             "muted": t.muted,
             "video": info["video"].as_bool().unwrap_or(false),
+            "musicOnly": self.settings.music_only,
+            "pip": self.media_pip,
             "background": self.visible != Some(t.d.id),
         })
     }

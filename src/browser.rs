@@ -80,11 +80,16 @@ const MEDIA_INFO_JS: &str = r#"(()=>{const m=navigator.mediaSession&&navigator.m
 /// back. Older WebKit without popovers falls back to fixed positioning.
 /// The fill is forced from a stylesheet rule, not inline styles: YouTube rewrites the video's
 /// inline size and offset on every resize, which used to shift and crop the docked video.
-const MINI_ON_JS: &str = r#"(()=>{if(document.getElementById('__rzen_mini'))return;const vs=[...document.querySelectorAll('video')];const v=vs.find(x=>!x.paused&&x.videoWidth>0)||vs.find(x=>x.videoWidth>0);if(!v)return;v.setAttribute('data-rzen-mini','');const I='!important;';const fill='position:fixed'+I+'inset:0'+I+'top:0'+I+'left:0'+I+'right:auto'+I+'bottom:auto'+I+'width:100vw'+I+'height:100vh'+I+'max-width:none'+I+'max-height:none'+I+'min-width:0'+I+'min-height:0'+I+'margin:0'+I+'padding:0'+I+'border:0'+I+'border-radius:0'+I+'transform:none'+I+'translate:none'+I+'scale:none'+I+'visibility:visible'+I+'opacity:1'+I+'pointer-events:auto'+I;const st=document.createElement('style');st.id='__rzen_mini_css';st.textContent='html,body{overflow:hidden!important}body *{visibility:hidden!important;pointer-events:none!important}video[data-rzen-mini]{'+fill+'object-fit:contain'+I+'background:#000'+I+'z-index:2147483646'+I+'}#__rzen_mini{'+fill+'background:transparent'+I+'z-index:2147483647'+I+'cursor:pointer}video[data-rzen-mini]::backdrop,#__rzen_mini::backdrop{background:transparent}[data-rzen-anc]{transform:none!important;filter:none!important;contain:none!important;container-type:normal!important;content-visibility:visible!important;will-change:auto!important;perspective:none!important;backdrop-filter:none!important;clip-path:none!important;mask:none!important;overflow:visible!important}';(document.head||document.documentElement).appendChild(st);const h=document.createElement('div');h.id='__rzen_mini';h.onclick=()=>{location.href='rzen-mini://focus'};document.documentElement.appendChild(h);let top=false;if(v.showPopover){try{v.setAttribute('popover','manual');v.showPopover();h.setAttribute('popover','manual');h.showPopover();top=true}catch(e){}}if(!top)for(let e=v.parentElement;e&&e!==document.documentElement;e=e.parentElement)e.setAttribute('data-rzen-anc','');dispatchEvent(new Event('resize'))})()"#;
-const MINI_OFF_JS: &str = r#"(()=>{const h=document.getElementById('__rzen_mini');for(const e of[...document.querySelectorAll('video[data-rzen-mini]'),h]){if(!e)continue;try{e.matches(':popover-open')&&e.hidePopover()}catch(x){}e.removeAttribute('popover');e.removeAttribute('data-rzen-mini')}h?.remove();document.getElementById('__rzen_mini_css')?.remove();for(const e of document.querySelectorAll('[data-rzen-anc]'))e.removeAttribute('data-rzen-anc');dispatchEvent(new Event('resize'))})()"#;
+/// Docks the playing video into the mini player: it fills the page's viewport in the top layer
+/// and everything else is hidden. Players reload or swap their <video> when the page resizes
+/// (YouTube does both) or for ads, so it keeps re-checking which one plays while docked.
+const MINI_ON_JS: &str = r#"(()=>{if(window.__rzenMini)return;const I='!important;';const fill='position:fixed'+I+'inset:0'+I+'top:0'+I+'left:0'+I+'right:auto'+I+'bottom:auto'+I+'width:100vw'+I+'height:100vh'+I+'max-width:none'+I+'max-height:none'+I+'min-width:0'+I+'min-height:0'+I+'margin:0'+I+'padding:0'+I+'border:0'+I+'border-radius:0'+I+'transform:none'+I+'translate:none'+I+'scale:none'+I+'visibility:visible'+I+'opacity:1'+I+'pointer-events:auto'+I;const st=document.createElement('style');st.id='__rzen_mini_css';st.textContent='html,body{overflow:hidden!important}body *{visibility:hidden!important;pointer-events:none!important}video[data-rzen-mini]{'+fill+'object-fit:contain'+I+'object-position:50% 50%'+I+'background:#000'+I+'z-index:2147483646'+I+'}#__rzen_mini{'+fill+'background:transparent'+I+'z-index:2147483647'+I+'cursor:pointer}video[data-rzen-mini]::backdrop,#__rzen_mini::backdrop{background:transparent}[data-rzen-anc]{transform:none!important;filter:none!important;contain:none!important;container-type:normal!important;content-visibility:visible!important;will-change:auto!important;perspective:none!important;backdrop-filter:none!important;clip-path:none!important;mask:none!important;overflow:visible!important}';(document.head||document.documentElement).appendChild(st);const h=document.createElement('div');h.id='__rzen_mini';h.onclick=()=>{location.href='rzen-mini://focus'};document.documentElement.appendChild(h);let cur=null;const top=(e)=>{try{e.matches(':popover-open')&&e.hidePopover()}catch(x){}try{e.setAttribute('popover','manual');e.showPopover();return true}catch(x){return false}};const pick=()=>{const vs=[...document.querySelectorAll('video')];return vs.find(x=>!x.paused)||vs.find(x=>x.currentTime>0)||vs.sort((a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight)[0]};const mark=(v)=>{if(cur&&cur!==v){try{cur.matches(':popover-open')&&cur.hidePopover()}catch(x){}cur.removeAttribute('popover');cur.removeAttribute('data-rzen-mini')}cur=v;v.setAttribute('data-rzen-mini','');for(const e of document.querySelectorAll('[data-rzen-anc]'))e.removeAttribute('data-rzen-anc');if(!(v.showPopover&&top(v)&&top(h)))for(let e=v.parentElement;e&&e!==document.documentElement;e=e.parentElement)e.setAttribute('data-rzen-anc','')};const tick=()=>{const v=pick();if(v&&(v!==cur||!v.isConnected||!v.hasAttribute('data-rzen-mini')||(v.showPopover&&!v.matches(':popover-open'))))mark(v)};tick();window.__rzenMini=setInterval(tick,400);dispatchEvent(new Event('resize'))})()"#;
+const MINI_OFF_JS: &str = r#"(()=>{clearInterval(window.__rzenMini);delete window.__rzenMini;const h=document.getElementById('__rzen_mini');for(const e of[...document.querySelectorAll('video[data-rzen-mini]'),h]){if(!e)continue;try{e.matches(':popover-open')&&e.hidePopover()}catch(x){}e.removeAttribute('popover');e.removeAttribute('data-rzen-mini')}h?.remove();document.getElementById('__rzen_mini_css')?.remove();for(const e of document.querySelectorAll('[data-rzen-anc]'))e.removeAttribute('data-rzen-anc');dispatchEvent(new Event('resize'))})()"#;
+/// Picture in picture for the playing video, or back out of it.
+const MEDIA_PIP_JS: &str = "(()=>{const vs=[...document.querySelectorAll('video')];const v=vs.find(x=>!x.paused)||vs.find(x=>x.currentTime>0)||vs[0];if(!v)return;const on=document.pictureInPictureElement||vs.find(x=>x.webkitPresentationMode==='picture-in-picture');if(on){document.pictureInPictureElement?document.exitPictureInPicture():on.webkitSetPresentationMode('inline');return}const legacy=()=>v.webkitSetPresentationMode&&v.webkitSetPresentationMode('picture-in-picture');v.requestPictureInPicture?v.requestPictureInPicture().catch(legacy):legacy()})()";
 const MEDIA_TOGGLE_JS: &str = r#"(()=>{const ms=[...document.querySelectorAll('video,audio')];const m=ms.find(x=>!x.paused)||ms.find(x=>x.currentTime>0)||ms[0];if(m){m.paused?m.play():m.pause()}})()"#;
 const MEDIA_STEP_JS: &str = r#"((next)=>{const sel=next?['.ytp-next-button','[data-testid="control-button-skip-forward"]','button[aria-label^="Next" i]','[aria-label*="next track" i]']:['.ytp-prev-button','[data-testid="control-button-skip-back"]','button[aria-label^="Previous" i]','[aria-label*="previous track" i]'];for(const s of sel){const b=document.querySelector(s);if(b){b.click();return}}const m=[...document.querySelectorAll('video,audio')].find(x=>!x.paused);if(m)m.currentTime=Math.max(0,m.currentTime+(next?10:-10))})"#;
-const MEDIA_TIME_JS: &str = "(()=>{const ms=[...document.querySelectorAll('video,audio')];const m=ms.find(x=>!x.paused)||ms.find(x=>x.currentTime>0);return m?[m.currentTime,isFinite(m.duration)?m.duration:0,!m.paused]:null})()";
+const MEDIA_TIME_JS: &str = "(()=>{const ms=[...document.querySelectorAll('video,audio')];const m=ms.find(x=>!x.paused)||ms.find(x=>x.currentTime>0);if(!m)return null;const v=m.tagName==='VIDEO'&&m.videoWidth?m:[...document.querySelectorAll('video')].find(x=>!x.paused&&x.videoWidth);const pip=!!document.pictureInPictureElement||[...document.querySelectorAll('video')].some(x=>x.webkitPresentationMode==='picture-in-picture');return[m.currentTime,isFinite(m.duration)?m.duration:0,!m.paused,v?v.videoWidth/v.videoHeight:0,pip]})()";
 const MEDIA_SEEK_JS: &str = "((f)=>{const ms=[...document.querySelectorAll('video,audio')];const m=ms.find(x=>!x.paused)||ms.find(x=>x.currentTime>0)||ms[0];if(m&&isFinite(m.duration))m.currentTime=f*m.duration})";
 const MEDIA_MUTE_JS: &str = "((on)=>document.querySelectorAll('video,audio').forEach(m=>m.muted=on))";
 
@@ -430,6 +435,8 @@ enum Msg {
     CopyUrl,
     OpenSettings,
     MediaSeek { frac: f64 },
+    MediaPip,
+    MediaMusicOnly,
     /// A command chosen in the command palette (⌃⇧P).
     Command { id: String },
     /// Where the sidebar's video slot is (None = no slot): the docked mini player goes there.
@@ -533,6 +540,8 @@ pub struct Browser {
     /// Sidebar video slot reported by the chrome, and the tab docked in it.
     mini_rect: Option<(f64, f64, f64, f64)>,
     mini_tab: Option<Id>,
+    /// The playing video is in picture in picture.
+    media_pip: bool,
     /// Settings section to scroll to once the settings page is ready.
     settings_focus: Option<String>,
     /// Your site customizations (Boosts).
@@ -715,6 +724,7 @@ impl Browser {
             share_anchor: (0.0, 0.0, 1.0, 1.0),
             mini_rect: None,
             mini_tab: None,
+            media_pip: false,
             settings_focus: None,
             boost_intent: None,
         };
@@ -1805,6 +1815,13 @@ impl Browser {
             }
             UserEvent::MediaTime(id, t) => {
                 if self.media_tab == Some(id) {
+                    // A video in picture in picture isn't in the page any more, so it can't dock.
+                    let pip = t[4].as_bool().unwrap_or(false);
+                    if pip != self.media_pip {
+                        self.media_pip = pip;
+                        self.sync_mini();
+                        self.ui_dirty = true;
+                    }
                     self.js(&format!("__rzen.mediaTime({t})"));
                 }
             }
@@ -2102,6 +2119,13 @@ impl Browser {
                 self.run_command(&id);
             }
             Msg::MediaSeek { frac } => self.media_js(&format!("{MEDIA_SEEK_JS}({})", frac.clamp(0.0, 1.0))),
+            Msg::MediaPip => self.media_js(MEDIA_PIP_JS),
+            Msg::MediaMusicOnly => {
+                self.settings.music_only = !self.settings.music_only;
+                self.save_settings();
+                self.sync_mini();
+                self.dirty();
+            }
             Msg::CopyUrl => {
                 if let Some(url) = self.active_id().and_then(|i| self.tab(i)).map(Tab::current_url) {
                     platform::copy_text(&url);
