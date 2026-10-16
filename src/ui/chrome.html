@@ -190,8 +190,12 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 #toast button:active { background-color: oklch(from var(--bg) l c h / 0.24); }
 #toast button:focus-visible { outline-color: var(--bg); outline-offset: -2px; }
 
-/* 28px row + the sidebar's 8px bottom padding = centered 22px from the bottom, mirroring the top row. */
-.bottombar { flex: none; height: 36px; display: flex; align-items: center; gap: 4px; padding: 8px 4px 0; }
+/* 28px row + the sidebar's 8px bottom padding = centered 22px from the bottom, mirroring the top row.
+   Three groups: you (leading), your spaces (centred on the sidebar), tools (trailing). */
+.bottombar { flex: none; height: 36px; display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 12px; padding: 8px 4px 0; }
+.bottombar .lead { display: flex; justify-self: start; }
+.bottombar .spaces { display: flex; align-items: center; min-width: 0; }
+.bottombar .trail { display: flex; align-items: center; gap: 4px; justify-self: end; }
 #wslist { display: flex; align-items: center; gap: 0; overflow-x: auto; min-width: 0; }
 #wslist::-webkit-scrollbar { height: 0; }
 #wslist { flex: 0 1 auto; }
@@ -199,7 +203,6 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 .wsb span { width: 6px; height: 6px; border-radius: 3px; background: var(--fg3); transition: width 200ms var(--ease), background-color 150ms var(--ease); }
 .wsb.active span { width: 16px; background: var(--fg); }
 .wsb.drop span { width: 16px; background: var(--fg2); }
-.bottombar .grow { flex: 1; }
 .mini { width: 24px; height: 28px; flex: none; color: var(--fg3); }
 .mini svg { width: 12px; height: 12px; }
 @media (hover: hover) { .mini:hover { color: var(--fg); } }
@@ -223,8 +226,8 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 .palette #pwrap { display: block; }
 #backdrop { position: absolute; inset: 0; background: var(--scrim); }
 #palette {
-  position: absolute; top: 18vh; inset-inline-start: calc(var(--fx) + (100vw - var(--fx) - var(--rx)) / 2); translate: -50% 0;
-  width: min(620px, calc(100vw - var(--fx) - var(--rx) - 40px)); border-radius: 14px; background: var(--raised); overflow: hidden;
+  position: absolute; top: 18vh; inset-inline-start: 50%; translate: -50% 0;
+  width: min(620px, calc(100vw - 40px)); border-radius: 14px; background: var(--raised); overflow: hidden;
   box-shadow: 0 0 0 1px var(--line), 0 16px 48px oklch(0 0 0 / 0.22), 0 4px 12px oklch(0 0 0 / 0.1);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -374,6 +377,9 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
 .private #b-profile svg { width: 14px; height: 14px; }
 .private #b-profile b { font-weight: 600; }
 #b-profile span, .avatar { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--fg); color: var(--bg); font-size: var(--t-xs); font-weight: 600; }
+/* In the bar the avatar is a control among icons: a quiet chip, not the brightest thing in the row. */
+#b-profile span { width: 20px; height: 20px; background: var(--field); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); transition: background-color 150ms var(--ease); }
+@media (hover: hover) { #b-profile:hover span { background: var(--press); } }
 #gate { position: fixed; inset: 0; z-index: 4; display: none; place-items: center; background: var(--bg); }
 .gated #gate, .new-profile #gate { display: grid; }
 .new-profile #gate { background: var(--scrim); }
@@ -448,12 +454,15 @@ kbd { font: inherit; font-weight: 500; color: var(--fg); padding: 1px 6px; borde
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <div class="bottombar">
-    <button id="b-profile" aria-label="Profile" title="Profile"><span></span></button>
-    <div id="wslist" role="tablist" aria-label="Spaces"></div>
-    <button class="mini" id="b-wsadd" aria-label="New space" title="New Space (⇧⌘N)"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
-    <span class="grow"></span>
+    <div class="lead"><button id="b-profile" aria-label="Profile" title="Profile"><span></span></button></div>
+    <div class="spaces">
+      <div id="wslist" role="tablist" aria-label="Spaces"></div>
+      <button class="mini" id="b-wsadd" aria-label="New space" title="New Space (⇧⌘N)"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
+    </div>
+    <div class="trail">
     <button class="icon-btn" id="b-ai" aria-label="Toggle AI panel" title="AI (⇧⌘A)"><svg viewBox="0 0 16 16"><path d="M8 1.8l1.6 4.6 4.6 1.6-4.6 1.6L8 14.2 6.4 9.6 1.8 8l4.6-1.6z"/></svg></button>
     <button class="icon-btn" id="b-settings" aria-label="Settings" title="Settings (⌘,)"><svg class="i24" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
   </div>
   <div id="resizer" aria-hidden="true"></div>
 </nav>
