@@ -36,6 +36,37 @@ fn uuid() -> String {
 /// uses Ctrl+A itself, like a web terminal, keeps it.
 const CTRL_A_JS: &str = "addEventListener('keydown',(e)=>{if(!e.ctrlKey||e.metaKey||e.altKey||e.shiftKey||e.defaultPrevented||e.key.toLowerCase()!=='a')return;const t=e.composedPath()[0];if(!(t instanceof Element)||!(t.isContentEditable||t.matches('input,textarea')))return;e.preventDefault();if(!t.isContentEditable&&t.select)t.select();else document.execCommand('selectAll')});";
 
+/// Keeps what you're reading in place when the page's width changes (sidebar, AI panel, window
+/// resize). WebKit doesn't anchor scrolling the way Chrome does, so text rewrapping above the
+/// viewport would push it by whole screens. Remembers the block at the top quarter of the view
+/// once scrolling settles, and after a resize scrolls just enough to put it back. Pages that
+/// move their own scroll on resize are left alone.
+const SCROLL_ANCHOR_JS: &str = r#"(() => {
+  if (window.top !== window) return;
+  let a = null, t = 0;
+  const pinned = (el) => { for (let n = el; n && n !== document.body; n = n.parentElement) { const p = getComputedStyle(n).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
+  const pick = () => {
+    a = null;
+    if (scrollY < 1 || !document.body) return;
+    for (const f of [0.25, 0.5, 0.1]) {
+      for (let el of document.elementsFromPoint(innerWidth / 2, innerHeight * f)) {
+        if (el === document.body || el === document.documentElement || pinned(el)) continue;
+        while (el.parentElement && el.parentElement !== document.body && getComputedStyle(el).display.startsWith('inline')) el = el.parentElement;
+        a = { el, top: el.getBoundingClientRect().top, y: scrollY };
+        return;
+      }
+    }
+  };
+  addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(pick, 120); }, { passive: true });
+  addEventListener('resize', () => {
+    if (!a || !a.el.isConnected) return;
+    if (Math.abs(scrollY - a.y) > 1) return pick();
+    const d = a.el.getBoundingClientRect().top - a.top;
+    if (Math.abs(d) >= 1) scrollTo({ top: scrollY + d, behavior: 'instant' });
+    a.y = scrollY;
+  });
+})();"#;
+
 impl Browser {
     // ---------- profile ----------
 
@@ -320,10 +351,11 @@ impl Browser {
 
     // ---------- notifications ----------
 
-    /// Boosts, Ctrl+A for text fields, and the notification shim with this profile's per-site decisions.
+    /// Boosts, Ctrl+A for text fields, scroll anchoring, and the notification shim with this profile's per-site decisions.
     pub(super) fn page_scripts(&self) -> Vec<String> {
         let mut scripts = crate::boosts::scripts(&self.boosts);
         scripts.push(CTRL_A_JS.into());
+        scripts.push(SCROLL_ANCHOR_JS.into());
         if platform::notifications_supported() {
             scripts.push(platform::NOTIFY_JS.replace("__PERMS__", &json!(self.notify_perms).to_string()));
         }
