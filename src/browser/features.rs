@@ -342,6 +342,9 @@ impl Browser {
 
     /// A page's `Notification` call. `origin` comes from WebKit, never from the page.
     pub(super) fn on_notify(&mut self, tab: Id, origin: String, msg: &str) {
+        if debug() {
+            log!("notify {tab} {origin} {msg}");
+        }
         let Ok(m) = serde_json::from_str::<Value>(msg) else { return };
         let site = util::short_host(&origin).to_string();
         let s = |k: &str| m[k].as_str().unwrap_or_default();
@@ -361,7 +364,33 @@ impl Browser {
                 }
             }
             "show" if self.notify_perms.get(&origin) == Some(&true) => {
-                platform::show_notification(tab, s("id"), s("key"), &site, s("title"), s("body"), m["silent"].as_bool().unwrap_or(false));
+                let n = WebNotification {
+                    tab,
+                    id: s("id").into(),
+                    key: s("key").into(),
+                    site,
+                    title: s("title").into(),
+                    body: s("body").into(),
+                    silent: m["silent"].as_bool().unwrap_or(false),
+                };
+                // The page's own icon (a sender's avatar, say), else the site's favicon.
+                let icon = Some(s("icon")).filter(|u| u.starts_with("http")).map(str::to_string).or_else(|| self.tab(tab).and_then(|t| t.d.favicon.clone()));
+                match icon {
+                    Some(href) if crate::favicons::path(&href).is_none() => {
+                        let p = self.sh.proxy.clone();
+                        std::thread::spawn(move || {
+                            let file = crate::favicons::fetch_blocking(&href);
+                            let _ = p.send_event(UserEvent::NotifyPost(n, file));
+                        });
+                    }
+                    icon => {
+                        let file = icon.and_then(|h| crate::favicons::path(&h));
+                        if debug() {
+                            log!("notification {:?} icon={:?}", n.title, file);
+                        }
+                        platform::show_notification(&n, file.as_deref());
+                    }
+                }
             }
             "close" => platform::close_notification(tab, s("key")),
             _ => {}

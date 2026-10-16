@@ -143,6 +143,8 @@ pub enum UserEvent {
     Notify(Id, String, String),
     /// The user answered a site's notification prompt: (tab, origin, request id, allowed).
     NotifyDecided(Id, String, u64, bool),
+    /// A notification whose icon was being downloaded is ready to post (icon file, if it came).
+    NotifyPost(WebNotification, Option<std::path::PathBuf>),
     /// A notification was clicked: (tab, page's notification id).
     NotifyClick(Id, String),
     /// macOS answered the app-level notification permission request.
@@ -290,6 +292,19 @@ fn build_internal_view(sh: &Rc<Shared>, html: &str) -> wry::Result<WebView> {
         .build_as_child(&sh.window)?;
     platform::style_content(&view);
     Ok(view)
+}
+
+/// A page's notification, ready for Notification Center.
+pub struct WebNotification {
+    pub tab: Id,
+    /// The page's id for it (clicks are reported back with it).
+    pub id: String,
+    /// The page's tag, else its id: a later one with the same key replaces it.
+    pub key: String,
+    pub site: String,
+    pub title: String,
+    pub body: String,
+    pub silent: bool,
 }
 
 /// A short message at the bottom of the sidebar. Timed notices fade on their own; errors and
@@ -1851,6 +1866,12 @@ impl Browser {
             UserEvent::AiAsk(selection) => self.ai_ask(&selection),
             UserEvent::Notify(tab, origin, msg) => self.on_notify(tab, origin, &msg),
             UserEvent::NotifyDecided(tab, origin, req, allowed) => self.notify_decided(tab, origin, req, allowed),
+            UserEvent::NotifyPost(n, icon) => {
+                if debug() {
+                    log!("notification {:?} icon={:?}", n.title, icon);
+                }
+                platform::show_notification(&n, icon.as_deref());
+            }
             UserEvent::NotifyClick(tab, id) => self.notify_click(tab, &id),
             UserEvent::NotifyAuth(granted) => {
                 if !granted {

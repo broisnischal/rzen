@@ -56,20 +56,43 @@ pub fn ensure(url: &str, done: impl FnOnce() + Send + 'static) {
     }
     let url = url.to_string();
     std::thread::spawn(move || {
-        let curl = if cfg!(windows) { "curl.exe" } else { "/usr/bin/curl" };
-        let out = Command::new(curl).args(["-sSfL", "--max-time", "8", "--max-filesize", MAX_BYTES, "--", &url]).output();
-        let bytes = out.ok().filter(|o| o.status.success()).map(|o| o.stdout).unwrap_or_default();
-        let stored = sniff(&bytes).is_some() && fs::create_dir_all(dir()).is_ok() && fs::write(dir().join(&k), &bytes).is_ok();
+        let stored = download(&url, &k, "8");
         if let Ok(mut p) = pending().lock() {
             p.remove(&k);
         }
         if stored {
-            if let Ok(mut c) = cached().lock() {
-                c.insert(k);
-            }
             done();
         }
     });
+}
+
+/// The stored file for an icon, once it's been downloaded.
+pub fn path(url: &str) -> Option<PathBuf> {
+    let k = key(url);
+    (url.starts_with("http") && cached().lock().is_ok_and(|c| c.contains(&k))).then(|| dir().join(k))
+}
+
+/// Downloads an icon on this thread, waiting at most a few seconds (a notification about to show).
+pub fn fetch_blocking(url: &str) -> Option<PathBuf> {
+    if let Some(p) = path(url) {
+        return Some(p);
+    }
+    let k = key(url);
+    (url.starts_with("http") && download(url, &k, "3")).then(|| dir().join(k))
+}
+
+/// Fetches and stores one icon; only real images are kept.
+fn download(url: &str, k: &str, max_secs: &str) -> bool {
+    let curl = if cfg!(windows) { "curl.exe" } else { "/usr/bin/curl" };
+    let out = Command::new(curl).args(["-sSfL", "--max-time", max_secs, "--max-filesize", MAX_BYTES, "--", url]).output();
+    let bytes = out.ok().filter(|o| o.status.success()).map(|o| o.stdout).unwrap_or_default();
+    let stored = sniff(&bytes).is_some() && fs::create_dir_all(dir()).is_ok() && fs::write(dir().join(k), &bytes).is_ok();
+    if stored {
+        if let Ok(mut c) = cached().lock() {
+            c.insert(k.to_string());
+        }
+    }
+    stored
 }
 
 /// Serves `rzenicon://i/<key>`: the stored bytes and their image type.

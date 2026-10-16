@@ -40,7 +40,7 @@ pub fn notifications_supported() -> bool {
 }
 pub fn init_notifications(_proxy: &tao::event_loop::EventLoopProxy<crate::browser::UserEvent>) {}
 pub fn authorize_notifications(_proxy: &tao::event_loop::EventLoopProxy<crate::browser::UserEvent>) {}
-pub fn show_notification(_tab: crate::model::Id, _id: &str, _key: &str, _site: &str, _title: &str, _body: &str, _silent: bool) {}
+pub fn show_notification(_n: &crate::browser::WebNotification, _icon: Option<&std::path::Path>) {}
 pub fn close_notification(_tab: crate::model::Id, _key: &str) {}
 pub fn activate_app() {}
 pub fn ask_notifications(_window: &Window, _site: &str, done: impl Fn(bool) + 'static) {

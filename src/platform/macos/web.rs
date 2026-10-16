@@ -1,7 +1,7 @@
 //! Web-platform pieces WKWebView leaves to the host app: ⌘-shortcuts for pages, JavaScript
 //! dialogs (`alert`/`confirm`/`prompt`) and web notifications.
 
-use std::{cell::Cell, ffi::c_char, sync::OnceLock};
+use std::{cell::Cell, ffi::c_char, path::Path, sync::OnceLock};
 
 use block2::{Block, DynBlock, RcBlock};
 use objc2::{
@@ -10,17 +10,20 @@ use objc2::{
     runtime::{AnyClass, AnyObject, Bool, Imp, NSObject, NSObjectProtocol, ProtocolObject, Sel},
     sel,
 };
-use objc2_app_kit::{NSAlert, NSApplication, NSEvent, NSEventModifierFlags, NSMenu, NSTextField, NSView, NSWindow};
-use objc2_foundation::{NSArray, NSBundle, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, ns_string};
+use objc2_app_kit::{NSAlert, NSApplication, NSBitmapImageFileType, NSBitmapImageRep, NSEvent, NSEventModifierFlags, NSImage, NSMenu, NSTextField, NSView, NSWindow};
+use objc2_foundation::{NSArray, NSBundle, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL, NSUUID, ns_string};
 use objc2_user_notifications::{
-    UNAuthorizationOptions, UNMutableNotificationContent, UNNotification, UNNotificationPresentationOptions,
+    UNAuthorizationOptions, UNMutableNotificationContent, UNNotification, UNNotificationAttachment, UNNotificationPresentationOptions,
     UNNotificationRequest, UNNotificationResponse, UNNotificationSound, UNUserNotificationCenter, UNUserNotificationCenterDelegate,
 };
 use objc2_web_kit::{WKFrameInfo, WKScriptMessage, WKScriptMessageHandler, WKUserContentController, WKWebView};
 use tao::{event_loop::EventLoopProxy, platform::macos::WindowExtMacOS, window::Window};
 use wry::{WebView, WebViewExtMacOS};
 
-use crate::{browser::UserEvent, model::Id};
+use crate::{
+    browser::{UserEvent, WebNotification},
+    model::Id,
+};
 
 // ---------- ⌘-shortcuts ----------
 
@@ -347,22 +350,46 @@ pub fn authorize_notifications(proxy: &EventLoopProxy<UserEvent>) {
         .requestAuthorizationWithOptions_completionHandler(UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound, &done);
 }
 
-/// Posts a page's notification. The same `key` (the page's tag, else its id) replaces it.
-pub fn show_notification(tab: Id, id: &str, key: &str, site: &str, title: &str, body: &str, silent: bool) {
+/// Posts a page's notification, with the site's icon beside it when there is one. The same
+/// `key` (the page's tag, else its id) replaces an earlier one.
+pub fn show_notification(n: &WebNotification, icon: Option<&Path>) {
+    let (tab, key) = (n.tab, n.key.as_str());
     let content = UNMutableNotificationContent::new();
-    content.setTitle(&NSString::from_str(title));
-    content.setSubtitle(&NSString::from_str(site));
-    content.setBody(&NSString::from_str(body));
-    if !silent {
+    content.setTitle(&NSString::from_str(&n.title));
+    content.setSubtitle(&NSString::from_str(&n.site));
+    content.setBody(&NSString::from_str(&n.body));
+    if !n.silent {
         content.setSound(Some(&UNNotificationSound::defaultSound()));
     }
+    if let Some(attachment) = icon.and_then(icon_attachment) {
+        content.setAttachments(&NSArray::from_retained_slice(&[attachment]));
+    }
     let tab_n = NSNumber::new_u64(tab as u64);
-    let id_s = NSString::from_str(id);
+    let id_s = NSString::from_str(&n.id);
     let info = NSDictionary::<NSString, AnyObject>::from_slices(&[ns_string!("tab"), ns_string!("id")], &[tab_n.as_ref(), id_s.as_ref()]);
     unsafe { content.setUserInfo(&*(Retained::as_ptr(&info) as *const NSDictionary)) };
     let ident = NSString::from_str(&format!("{tab}:{key}"));
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(&ident, &content, None);
     UNUserNotificationCenter::currentNotificationCenter().addNotificationRequest_withCompletionHandler(&request, None);
+}
+
+/// Notification Center takes PNG, JPEG or GIF attachments and moves the file into its own store,
+/// so the cached icon (often .ico or SVG) is redrawn as a PNG in a temporary file of its own.
+fn icon_attachment(path: &Path) -> Option<Retained<UNNotificationAttachment>> {
+    let image = NSImage::initWithContentsOfFile(NSImage::alloc(), &NSString::from_str(path.to_str()?))?;
+    let tiff = image.TIFFRepresentation()?;
+    let rep = NSBitmapImageRep::imageRepWithData(&tiff)?;
+    let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
+    let file = std::env::temp_dir().join(format!("rzen-notification-{}.png", NSUUID::new().UUIDString()));
+    std::fs::write(&file, png.to_vec()).ok()?;
+    let url = NSURL::fileURLWithPath(&NSString::from_str(file.to_str()?));
+    match unsafe { UNNotificationAttachment::attachmentWithIdentifier_URL_options_error(ns_string!("icon"), &url, None) } {
+        Ok(a) => Some(a),
+        Err(e) => {
+            log!("rzen: notification icon not attached: {}", e.localizedDescription());
+            None
+        }
+    }
 }
 
 pub fn close_notification(tab: Id, key: &str) {
@@ -412,7 +439,9 @@ pub const NOTIFY_JS: &str = r#"(() => {
       if (perm !== 'granted') { queueMicrotask(() => this._fire('error')); return; }
       for (const [id, n] of live) if (this.tag && n.tag === this.tag) live.delete(id);
       live.set(this._id, this);
-      post({ t: 'show', id: this._id, key: this.tag || this._id, title: this.title, body: this.body, silent: this.silent });
+      let icon = '';
+      try { icon = this.icon ? new URL(this.icon, location.href).href : ''; } catch (e) {}
+      post({ t: 'show', id: this._id, key: this.tag || this._id, title: this.title, body: this.body, icon, silent: this.silent });
       queueMicrotask(() => this._fire('show'));
     }
     _fire(type) {
