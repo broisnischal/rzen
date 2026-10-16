@@ -41,6 +41,8 @@ const TICK: Duration = Duration::from_secs(15);
 /// How often the visible tab's back/forward state and address are re-read: single-page sites
 /// (YouTube, X, GitHub) navigate without a page load, so load events alone leave them stale.
 const NAV_POLL: Duration = Duration::from_millis(250);
+/// How long after a spare web view is used (or dropped) the next one is built.
+const SPARE_DELAY: Duration = Duration::from_millis(1500);
 const PERF_EVERY: Duration = Duration::from_secs(2);
 /// Loaded-tab cap while macOS reports memory pressure.
 const PRESSURE_CAP: usize = 3;
@@ -551,6 +553,11 @@ pub struct Browser {
     mini_tab: Option<Id>,
     /// RZEN_DEBUG: when each tab's current navigation started.
     nav_t0: HashMap<Id, Instant>,
+    /// A blank web view built ahead of time, so opening a tab doesn't wait ~30ms for one. Its
+    /// tab id is reserved now (wry bakes it into the view's handlers), with the store it uses.
+    spare: Option<(Id, Option<[u8; 16]>, WebView)>,
+    /// When to build the next spare (after startup settles, after one is used or dropped).
+    spare_at: Option<Instant>,
     /// The playing video is in picture in picture.
     media_pip: bool,
     /// Settings section to scroll to once the settings page is ready.
@@ -736,6 +743,8 @@ impl Browser {
             mini_rect: None,
             mini_tab: None,
             nav_t0: HashMap::new(),
+            spare: None,
+            spare_at: Some(Instant::now() + SPARE_DELAY * 2),
             media_pip: false,
             settings_focus: None,
             boost_intent: None,
@@ -966,7 +975,7 @@ impl Browser {
                 t.loading = !t.is_internal();
                 t.view = Some(view);
                 if debug() {
-                    log!("perf view {} built in {:.1}ms", t.d.id, t0.elapsed().as_secs_f64() * 1000.0);
+                    log!("perf view {} built in {:.1}ms at t+{}ms", t.d.id, t0.elapsed().as_secs_f64() * 1000.0, crate::STARTED.get().map_or(0, |s| s.elapsed().as_millis()));
                     self.nav_t0.insert(self.tabs[i].d.id, t0);
                 }
             }
@@ -1045,15 +1054,55 @@ impl Browser {
 
     /// New tabs go to the top of the sidebar's tab list, newest first.
     fn open_tab(&mut self, url: String, activate: bool) -> Id {
-        let id = self.sh.alloc_id();
         let workspace = self.active_ws;
         let title = internal(&url).map_or_else(String::new, |p| p.1.to_string());
-        self.tabs.insert(0, Tab::new(TabData { id, url, title, workspace, ..Default::default() }));
+        let mut d = TabData { url, title, workspace, ..Default::default() };
+        let store = self.store_for(&d);
+        let spare = self.spare.take_if(|(_, s, _)| internal(&d.url).is_none() && *s == store);
+        d.id = spare.as_ref().map_or_else(|| self.sh.alloc_id(), |s| s.0);
+        let id = d.id;
+        let mut tab = Tab::new(d);
+        if let Some((_, _, view)) = spare {
+            if debug() {
+                self.nav_t0.insert(id, Instant::now());
+            }
+            let _ = view.load_url(if tab.d.url.is_empty() { "about:blank" } else { &tab.d.url });
+            tab.loading = true;
+            tab.view = Some(view);
+            self.spare_at = Some(Instant::now() + SPARE_DELAY);
+        }
+        self.tabs.insert(0, tab);
         if activate {
             self.show(id);
         }
         self.dirty();
         id
+    }
+
+    /// Builds the spare web view while nothing else is going on.
+    fn build_spare(&mut self) {
+        if self.spare.is_some() || !self.chrome_ready || self.gate.is_some() || self.exiting {
+            self.spare_at = None;
+            return;
+        }
+        if self.tabs.iter().any(|t| t.loading) {
+            self.spare_at = Some(Instant::now() + SPARE_DELAY);
+            return;
+        }
+        self.spare_at = None;
+        let id = self.sh.alloc_id();
+        let store = self.store_for(&TabData { workspace: self.active_ws, ..Default::default() });
+        if let Ok(view) = build_tab_view(&self.sh, id, None, store, |b| b) {
+            self.spare = Some((id, store, view));
+        }
+    }
+
+    /// Page scripts, blocking or network settings changed: a spare built before would miss them.
+    pub(super) fn drop_spare(&mut self) {
+        if let Some((_, _, view)) = self.spare.take() {
+            platform::release(&view);
+            self.spare_at = Some(Instant::now() + SPARE_DELAY);
+        }
     }
 
     fn open_settings(&mut self) {
@@ -1506,6 +1555,7 @@ impl Browser {
             let _ = p.send_event(UserEvent::BlockerReady);
         });
         self.tabs.iter().filter_map(|t| t.view.as_ref()).for_each(platform::apply_blocker);
+        self.drop_spare();
         self.enforce_live_cap();
         self.apply_proxy();
         match (self.settings.agent_enabled, self.agent.is_some()) {
@@ -1908,6 +1958,7 @@ impl Browser {
             UserEvent::Menu(id) => self.on_menu(&id),
             UserEvent::BlockerReady => {
                 self.tabs.iter().filter_map(|t| t.view.as_ref()).for_each(platform::apply_blocker);
+                self.drop_spare();
             }
             UserEvent::DefaultBrowserChanged => self.push_settings(),
             UserEvent::Agent(call) => self.on_agent(call),
@@ -2667,6 +2718,9 @@ impl Browser {
         if now >= self.nav_next {
             self.nav_next = now + NAV_POLL;
             self.sync_nav();
+        }
+        if self.spare_at.is_some_and(|t| now >= t) {
+            self.build_spare();
         }
         if self.toast.as_ref().and_then(|t| t.until).is_some_and(|until| until <= now) {
             self.toast = None;

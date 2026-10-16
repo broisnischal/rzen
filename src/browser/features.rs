@@ -440,6 +440,7 @@ impl Browser {
         model::save_json(&self.dir.join("notifications.json"), &self.notify_perms, true);
         // New loads get the decision from the shim; open pages of that site hear it now.
         platform::set_page_scripts(self.page_scripts());
+        self.drop_spare();
         let state = if allowed { "granted" } else { "denied" };
         let update = format!("window.__rzenNotify&&location.origin==={}&&__rzenNotify.perm({})", json!(origin), json!(state));
         for v in self.tabs.iter().filter(|t| !t.is_internal()).filter_map(|t| t.view.as_ref()).chain(self.ai_view.as_ref()) {
@@ -471,6 +472,7 @@ impl Browser {
     pub(super) fn boosts_changed(&mut self) {
         crate::boosts::save(&self.dir, &self.boosts);
         platform::set_page_scripts(self.page_scripts());
+        self.drop_spare();
         let restyle = crate::boosts::restyle_js(&self.boosts);
         for v in self.tabs.iter().filter(|t| !t.is_internal()).filter_map(|t| t.view.as_ref()) {
             platform::apply_page_scripts(v);
